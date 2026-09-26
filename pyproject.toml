@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "borrowed-intimacy"
+version = "0.1.0"
+description = "Source, crawl, discovery, document, and evidence API for Borrowed Intimacy"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic>=2.9.0",
+    "pydantic-settings>=2.6.0",
+    "sqlalchemy>=2.0.36",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+# External discovery CLIs are optional; the API supports their absence.
+osint = [
+    "networkx>=2.8,<3",
+    "sherlock-project>=0.16,<0.17",
+    "maigret>=0.5,<0.6",
+]
+dev = [
+    "pytest>=8.3.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["apps*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "apps/api/tests"]
+pythonpath = ["."]

@@ -1,4 +1,5 @@
 # Byte-compiled / optimized / DLL files
+.DS_Store
 __pycache__/
 *.py[codz]
 *$py.class
@@ -216,3 +217,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Runtime OSINT dataset cache (deterministic fixtures stay committed)
+data/cache/
+# Local Borrowed Intimacy databases
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal

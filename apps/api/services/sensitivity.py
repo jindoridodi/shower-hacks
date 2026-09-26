@@ -11,7 +11,6 @@ class Finding:
     # No source spans, values, or excerpts are returned or logged.
 
 
-# !?!?!?!?
 PATTERNS = {
     'email': r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}',
     'phone': r'(?<!\w)(?:\+?\d[\d ().-]{7,}\d)(?!\w)',

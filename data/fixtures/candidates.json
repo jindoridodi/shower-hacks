@@ -1,0 +1,7 @@
+{
+  "demo-user": {
+    "sherlock": [{"url": "https://example.com/demo-user", "platform": "example.com", "candidateUsername": "demo-user", "matchReason": "Sherlock fixture found a public profile URL."}],
+    "maigret": [{"url": "https://example.com/demo-user?utm_source=fixture", "platform": "example.com", "candidateUsername": "demo-user", "matchReason": "Maigret fixture found the same public profile URL."}],
+    "whatsmyname": [{"url": "https://profiles.example.net/demo-user", "platform": "profiles.example.net", "candidateUsername": "demo-user", "matchReason": "WhatsMyName fixture matched a public profile pattern."}]
+  }
+}

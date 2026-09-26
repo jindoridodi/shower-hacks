@@ -1,0 +1,15 @@
+services:
+  spiderfoot:
+    build:
+      context: .
+      args:
+        SPIDERFOOT_REF: v4.0
+    image: shower-hacks-spiderfoot:v4.0
+    ports:
+      - "127.0.0.1:5001:5001"
+    volumes:
+      - spiderfoot-data:/var/lib/spiderfoot
+    restart: unless-stopped
+
+volumes:
+  spiderfoot-data:

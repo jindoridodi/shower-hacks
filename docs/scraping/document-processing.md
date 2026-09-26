@@ -1,6 +1,7 @@
 # Document processing handoff (Sehyun)
 
-Python standard library only; no API keys, network, models or workers required.
+The pure processing functions use the Python standard library. Database integration
+uses the existing SQLAlchemy/SQLite backend; no API keys or network calls are required.
 English is the supported language for this pipeline: detection rules, examples,
 status/error messages and search validation use English. There is no automatic
 translation or language rejection. Unicode source text is preserved, but
@@ -9,8 +10,14 @@ non-English contextual sensitivity detection is unsupported.
 Run from repository root:
 
 ```sh
-python3 -m unittest discover -s tests -p 'test_*.py' -v
+pip install -e ".[dev]"
+pytest
+python -m unittest discover -s tests -t . -v
 ```
+
+Optional external discovery CLIs retain their existing adapters and can be installed
+with `pip install -e ".[dev,osint]"` on a platform supported by their dependencies.
+They are not required to run the API, fixture providers, or these tests.
 
 ## Emily: inspect BEFORE storing or logging
 
@@ -54,13 +61,14 @@ must also verify source ownership. The result and its chunks preserve the ID.
 
 For main's current insert-generated IDs, inspect/filter the body and metadata
 BEFORE stage_document, skip empty filtered bodies, and store only filtered data.
-Then use the returned document.id for processing/chunking within the same
+Then use the returned document.id for chunking the prepared text within the same
 transaction. Never store unfiltered content just to obtain an ID. If processing
 is repeated, keep original redaction findings/status; sanitized input alone
 cannot reconstruct them. Reused documents from deduplication also use their
 existing DB ID. This integration is now wired into main ingest_scraped_page.
-prepare_document performs filtering before the insert; process_document uses the
-returned DB ID and the original in-memory input to preserve redaction status.
+prepare_document performs filtering once before the insert; chunk_text receives the
+returned DB ID, prepared text and original inspection status. Findings are retained
+on the document instead of re-detecting them from sanitized text.
 Only newly created documents get new chunks; deduplicated documents retain their
 existing chunks and stored metadata. Historical content is not reprocessed.
 
@@ -121,9 +129,11 @@ ownership through the existing source_id. Other Firecrawl metadata and source
 records still require inspection before persistence. Do not store the incoming
 payload alongside the filtered output.
 
-The 14 standalone tests in `tests/test_sensitivity.py` cover filtering and
-processing/metadata. Main adds ingestion integration tests in test_firecrawl_stub.py
-and persistent FTS5/API tests in test_documents.py. Run main tests using pytest.
+The standalone tests in `tests/test_sensitivity.py` and `tests/test_processing.py`
+cover filtering, normalization, metadata, offsets and lossless reconstruction.
+`tests/test_ingestion.py` checks writes, rejected pages, database IDs, deduplication
+and rollback. `tests/test_retrieval.py` exercises the real SQLite FTS5 backend.
+The existing backend tests remain in place and run with pytest.
 
 ## Chunk and FTS integration
 
@@ -163,16 +173,19 @@ failed and records a fixed reason without rejected content. Callers must handle
 None; retries can queue another crawl. Processing errors roll back the insert.
 Source URLs are existing source records; this path does not rewrite them.
 Direct /documents writes retain main's existing behavior and do not automatically
-run the scraper processing pipeline. Findings and offsets are available from the
-pure processing function but do not have dedicated DB columns.
+run the scraper processing pipeline. Migration 003 adds document columns for `processing_metadata`,
+`sensitivity_findings` and `metadata_findings`, also exposed by DocumentRead. These
+contain filtered metadata and category labels only; existing rows default to empty
+objects/lists. The same migration corrects FTS5 update/delete triggers for the
+existing standalone index, preserving search synchronization. Deduplication retains the original stored provenance. Offsets remain
+in the pure processing result and refer to cleaned text, not source HTML.
 The scraper remains a stub: no actual Firecrawl request or embedding is added.
 
 Detection separates category patterns from status policy. Supported heuristics
 cover conventional emails/phone-like numbers, labeled credentials and financial
 identifiers, some token prefixes, English health/finance/location cues,
 coordinates and selected ambiguous contact expressions. Percent decoding and
-HTML entity decoding help inspect Markdown link destinations. No Presidio or
-language model is installed; there were no existing dependencies to reuse.
+HTML entity decoding help inspect Markdown link destinations. No Presidio or language model is used in this processing path.
 
 These heuristics miss unfamiliar credentials, obfuscation, images, indirect
 medical facts, unlabeled addresses and many languages/context variants. Numeric

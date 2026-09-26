@@ -1,0 +1,8 @@
+{
+  "label": "AI-generated draft — review before use",
+  "recipient": "Project collaborator",
+  "subject": "Your public-archive work",
+  "body": "I enjoyed learning about your work with public archives and community storytelling. The Neighborhood Memory Map project and your Open Archives Symposium presentation made that focus especially clear. This draft is based only on the linked public sources and should be reviewed before use.",
+  "sourceIds": ["src_portfolio", "src_project", "src_talk"],
+  "reviewRequired": true
+}
