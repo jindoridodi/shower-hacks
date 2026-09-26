@@ -3,9 +3,10 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Literal, Protocol
+from typing import Any, Literal
 
 from apps.api.services.claim_validation import ClaimValidationError, validate_claims
+from apps.api.services.text_model import TextModel
 
 
 ReportMode = Literal["factual_profile", "uncertainty_report"]
@@ -13,10 +14,6 @@ ReportMode = Literal["factual_profile", "uncertainty_report"]
 
 class ReportGenerationError(ValueError):
     pass
-
-
-class ReportModel(Protocol):
-    def generate(self, prompt: str) -> str: ...
 
 
 _ROOT = Path(__file__).resolve().parents[3]
@@ -33,7 +30,7 @@ def generate_report(
     generated_at: str,
     mode: ReportMode,
     evidence_excerpts: Sequence[Mapping[str, Any]],
-    model: ReportModel | None = None,
+    model: TextModel | None = None,
     use_fixtures: bool = False,
 ) -> dict[str, Any]:
     safe_evidence = [excerpt for excerpt in evidence_excerpts if excerpt.get("sensitivityStatus") == "safe"]
