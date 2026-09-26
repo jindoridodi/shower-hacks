@@ -8,57 +8,6 @@ export const metadata: Metadata = {
   description: "we see you 👀",
 };
 
-function Nav() {
-  return (
-    <nav className="sticky top-0 z-50 border-b-3 border-freaky-dark bg-bg/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-6">
-        <Link href="/" className="flex items-center gap-2 transition-transform hover:scale-105">
-          <Image
-            src="/logo.png"
-            alt="freakypeeky"
-            width={140}
-            height={50}
-            className="h-10 w-auto"
-            priority
-          />
-        </Link>
-
-        <div className="flex items-center gap-1">
-          <NavLink href="/" emoji="🔍">
-            Stalk
-          </NavLink>
-          <NavLink href="/persona" emoji="🎭">
-            Persona
-          </NavLink>
-          <NavLink href="/love-letters" emoji="💌">
-            Love Letters
-          </NavLink>
-        </div>
-      </div>
-    </nav>
-  );
-}
-
-function NavLink({
-  href,
-  emoji,
-  children,
-}: {
-  href: string;
-  emoji: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={href}
-      className="rounded-full border-2 border-transparent px-4 py-1.5 font-display text-sm font-bold text-freaky-dark transition-all hover:border-freaky-red hover:bg-freaky-red/10 hover:-rotate-1"
-    >
-      <span className="mr-1">{emoji}</span>
-      {children}
-    </Link>
-  );
-}
-
 export default function RootLayout({
   children,
 }: {
@@ -67,7 +16,21 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen">
-        <Nav />
+        <div className="px-6 pt-4">
+          <Link
+            href="/"
+            className="inline-block transition-all duration-200 hover:scale-110 hover:-rotate-2 active:scale-95 active:rotate-1"
+          >
+            <Image
+              src="/logo.png"
+              alt="freakypeeky"
+              width={300}
+              height={106}
+              className="h-24 w-auto drop-shadow-md hover:drop-shadow-xl transition-all duration-200"
+              priority
+            />
+          </Link>
+        </div>
         {children}
       </body>
     </html>
