@@ -6,7 +6,7 @@ def chunk_text(text: str, *, document_id: str, source_id: str,
                sensitivity_status: str, max_chars: int = 1000) -> list[dict]:
     if max_chars < 1:
         raise ValueError('max_chars must be positive')
-    if sensitivity_status not in {'approved', 'redacted'} or not text.strip():
+    if sensitivity_status not in {'clear', 'redacted'} or not text.strip():
         return []
     chunks = []
     start = 0

@@ -21,11 +21,11 @@ class ChunkSearch:
             raise ValueError('project_id is required')
         doc_id, source_id = result['document_id'], result['source_id']
         rows = []
-        if result['sensitivity_status'] in {'approved', 'redacted'}:
+        if result['sensitivity_status'] in {'clear', 'redacted'}:
             for chunk in result['chunks']:
                 if chunk['document_id'] != doc_id or chunk['source_id'] != source_id:
                     raise ValueError('chunk ownership mismatch')
-                if prepare_for_storage(chunk['text'])['sensitivity_status'] != 'approved':
+                if prepare_for_storage(chunk['text'])['sensitivity_status'] != 'clear':
                     raise ValueError('chunk has not passed filtering')
                 rows.append((project_id, source_id, doc_id, chunk['chunk_index'], chunk['text']))
         with self.connection:

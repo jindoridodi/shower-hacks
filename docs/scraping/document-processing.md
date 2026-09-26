@@ -18,8 +18,8 @@ python3 -m unittest discover -s tests -p 'test_*.py' -v
 from apps.api.services.sensitivity import prepare_for_storage
 
 checked = prepare_for_storage(markdown)
-if checked['raw_content'] is not None:
-    storage_markdown = checked['raw_content']
+if checked['raw_text'] is not None:
+    storage_markdown = checked['raw_text']
     # Pass storage_markdown and checked status/findings to Trista.
 else:
     # Persist only IDs/status/category-only findings if needed.
@@ -27,13 +27,18 @@ else:
     pass
 ```
 
-`raw_content` is filtered Markdown suitable under this limited policy, NOT an
-unaltered Firecrawl original. `approved` means no supported detector fired;
-it does not certify absence of sensitive information. `redacted` means entire
-contact-bearing paragraphs were removed. `needs_review` and `blocked` return
-`raw_content=None`, no cleaned body and no chunks in the processing entry point.
-A reviewer must supply a newly sanitized input; merely changing the status is
-not a review workflow. There is no persistent quarantine in this implementation.
+`raw_text` is filtered Markdown suitable under this limited policy, NOT an
+unaltered Firecrawl original. `clear` means no supported detector fired;
+it does not certify absence of sensitive information. `redacted` means content
+was removed: any blank-line-delimited block containing a detected category is
+removed, including credentials and contextual candidates. Other blocks remain.
+Detection runs per block; context spanning separate blocks may be missed.
+When no usable blocks remain, processing returns
+`raw_text=None`, an empty cleaned body and no chunks. Skip document persistence
+when `raw_text` is None; the production schema requires a nonempty body.
+`unreviewed` means not yet inspected and is never returned by the inspection
+function. Chunking and indexing exclude it. There is no manual-review state.
+Empty input without findings is `clear`, but has no usable body or chunks.
 
 Run the check on the original in memory before cleaning, so removing boilerplate
 cannot conceal a sensitive finding. Never log incoming payloads or exceptions
@@ -41,13 +46,20 @@ containing their contents. Findings expose categories only, not values or spans.
 
 ## Trista: process the original in memory once
 
+`document_id` is optional. Omitting it or passing `None` generates a UUID v4;
+an existing nonempty string ID is preserved. The result and all its chunks use
+the same ID. The input dict is not modified. Each call without an ID generates
+a new one; this is not content deduplication. The example below supplies a fixed
+ID for readability. When integrating with a DB that creates its own IDs, persist
+this ID explicitly or remap the result to the ID returned by the DB.
+
 ```python
 from apps.api.services.processing import process_document
 
 result = process_document({
     'document_id': 'doc_1',
     'source_id': 'source_1',
-    'raw_content': '# Alex\n\nEnjoys hiking.\n\nContact alex@example.test',
+    'raw_text': '# Alex\n\nEnjoys hiking.\n\nContact alex@example.test',
     'metadata': {'url': 'https://example.com/about', 'title': 'About Alex'},
 })
 ```
@@ -58,7 +70,7 @@ Result (all content here is fictional):
 {
   "document_id": "doc_1",
   "source_id": "source_1",
-  "raw_content": "# Alex\n\nEnjoys hiking.",
+  "raw_text": "# Alex\n\nEnjoys hiking.",
   "cleaned_text": "# Alex\n\nEnjoys hiking.",
   "sensitivity_status": "redacted",
   "findings": [{"category": "email"}],
@@ -75,7 +87,7 @@ Result (all content here is fictional):
 }
 ```
 
-Persist only returned `raw_content` and `cleaned_text` when content is allowed.
+Persist only returned `raw_text` and `cleaned_text` when content is allowed.
 Use returned chunk text for `claim_sources.excerpt`. Offsets refer to the filtered
 `cleaned_text`, never original Markdown. Keep the `redacted` provenance when
 rendering evidence; do not label it a verbatim original quote. If Emily already
@@ -127,7 +139,7 @@ the same project/source restrictions and status exclusions.
 Cleaner → sensitivity → chunk output and chunk output → temporary FTS are tested
 locally (sensitivity runs first). Firecrawl, storage routes, persistent FTS and
 workers are currently empty and are NOT connected. The older database document
-uses `documents.content`; the agreed `raw_content` / `cleaned_text` /
+uses `documents.content`; the agreed `raw_text` / `cleaned_text` /
 `document_chunks` schema still belongs to Trista. The older Firecrawl pipeline
 places storage before inspection: integrators must move inspection before any
 raw-body write. No production schema or other teammate's API was changed.
@@ -142,7 +154,7 @@ language model is installed; there were no existing dependencies to reuse.
 These heuristics miss unfamiliar credentials, obfuscation, images, indirect
 medical facts, unlabeled addresses and many languages/context variants. Numeric
 IDs/dates may be over-redacted as phone candidates. Health/finance words may
-hold educational content for review. Removing an entire paragraph can discard
+remove educational content as a false positive. Removing an entire paragraph can discard
 useful adjacent facts and disrupt a Markdown construct spanning paragraphs.
 No site-specific boilerplate rules ship without samples; callers may supply
 confirmed exact lines, which are not removed inside fenced/indented code.

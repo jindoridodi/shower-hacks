@@ -24,10 +24,10 @@ PATTERNS = {
 }
 # Detection and policy are deliberately separate.
 POLICY = {
-    'email': 'redacted', 'phone': 'redacted',
-    'credential': 'blocked', 'financial_identifier': 'blocked',
-    'health_context': 'needs_review', 'finance_context': 'needs_review',
-    'private_location': 'needs_review', 'ambiguous_contact': 'needs_review',
+    'email': 'remove_block', 'phone': 'remove_block',
+    'credential': 'remove_block', 'financial_identifier': 'remove_block',
+    'health_context': 'remove_block', 'finance_context': 'remove_block',
+    'private_location': 'remove_block', 'ambiguous_contact': 'remove_block',
 }
 
 
@@ -40,29 +40,28 @@ def detect_sensitive(text: str) -> list[Finding]:
             if re.search(pattern, decoded)]
 
 
-def prepare_for_storage(raw_content: str) -> dict:
+def prepare_for_storage(raw_text: str) -> dict:
     """Run BEFORE any persistence/logging. None means do not store the content.
 
-    Contact-bearing paragraphs are removed wholesale, including link destinations.
-    Contextual candidates withhold the entire document pending review.
+    Paragraphs with any detected category are removed, including link destinations.
+    Blocks are separated by blank lines; unaffected blocks are retained.
+    unreviewed is reserved for inputs that have not been inspected.
     """
-    if not isinstance(raw_content, str):
-        raise TypeError('raw_content must be a string')
-    findings = detect_sensitive(raw_content)
-    categories = {f.category for f in findings}
-    actions = {POLICY[c] for c in categories}
-    if 'blocked' in actions:
-        status, safe = 'blocked', None
-    elif 'needs_review' in actions:
-        status, safe = 'needs_review', None
-    else:
-        normalized = raw_content.replace('\r\n', '\n').replace('\r', '\n')
-        # Whole blocks also avoid leaving table headers or reference-link labels
-        # attached to a removed contact value in the same paragraph.
-        blocks = re.split(r'\n[ \t]*\n', normalized)
-        safe = '\n\n'.join(block for block in blocks if not detect_sensitive(block))
-        status = 'redacted' if findings else 'approved'
-        if not safe.strip():
-            status, safe = 'blocked', None
-    return {'raw_content': safe, 'sensitivity_status': status,
+    if not isinstance(raw_text, str):
+        raise TypeError('raw_text must be a string')
+    normalized = raw_text.replace('\r\n', '\n').replace('\r', '\n')
+    blocks = re.split(r'\n[ \t]*\n', normalized)
+    kept = []
+    categories = set()
+    for block in blocks:
+        findings = detect_sensitive(block)
+        categories.update(f.category for f in findings)
+        if not any(POLICY[f.category] == 'remove_block' for f in findings):
+            kept.append(block)
+    safe = '\n\n'.join(kept)
+    status = 'redacted' if categories else 'clear'
+    if not safe.strip():
+        safe = None
+    findings = [Finding(category) for category in PATTERNS if category in categories]
+    return {'raw_text': safe, 'sensitivity_status': status,
             'findings': [asdict(f) for f in findings]}
