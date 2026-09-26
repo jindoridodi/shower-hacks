@@ -8,6 +8,7 @@ from apps.api.models.tables import (
     Report,
     ReportClaim,
     Source,
+    SourceApproval,
 )
 
 __all__ = [
@@ -20,4 +21,5 @@ __all__ = [
     "Report",
     "ReportClaim",
     "Source",
+    "SourceApproval",
 ]
