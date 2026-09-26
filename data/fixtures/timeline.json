@@ -1,0 +1,15 @@
+[
+  {
+    "dateText": "2024",
+    "eventText": "Neighborhood Memory Map combined oral-history excerpts with photographs from local public collections.",
+    "sourceId": "src_project",
+    "confidence": 0.86
+  },
+  {
+    "dateText": "March 14, 2025",
+    "normalizedDate": "2025-03-14",
+    "eventText": "Avery Chen presented Designing With Public Records at the Open Archives Symposium.",
+    "sourceId": "src_talk",
+    "confidence": 0.94
+  }
+]
