@@ -99,16 +99,16 @@ The result must identify the canonical Team 3 source record and preserve the sel
 
 ### A2 — Implement explicit candidate approval
 
-- [ ] Add a candidate-approval request model using the frozen contract.
-- [ ] Validate the selected candidate URL again at approval time.
-- [ ] Validate that the approval username matches `candidateUsername` when present.
-- [ ] Require a canonical Team 3 project ID.
-- [ ] Preserve URL, platform, username, confidence, match reason, and provider evidence.
-- [ ] Call the agreed Team 3 source-creation/promote boundary.
-- [ ] Ensure the result is saved as selected/approved, not crawled.
-- [ ] Ensure approval never queues a crawl.
-- [ ] Handle duplicate approved URLs according to the frozen contract.
-- [ ] Return a clear result for a missing project, invalid URL, or duplicate source.
+- [x] Add a candidate-approval request model using the frozen contract.
+- [x] Validate the selected candidate URL again at approval time.
+- [x] Validate that the approval username matches `candidateUsername` when present.
+- [x] Require a canonical Team 3 project ID.
+- [x] Preserve URL, platform, username, confidence, match reason, and provider evidence.
+- [x] Call the agreed Team 3 source-creation/promote boundary.
+- [x] Ensure the result is saved as selected/approved, not crawled.
+- [x] Ensure approval never queues a crawl.
+- [x] Handle duplicate approved URLs according to the frozen contract.
+- [x] Return a clear result for a missing project, invalid URL, or duplicate source.
 
 ### A3 — Provider test coverage
 
@@ -118,9 +118,9 @@ The result must identify the canonical Team 3 source record and preserve the sel
 - [ ] Test one provider failure while another provider succeeds.
 - [ ] Test cross-provider deduplication and high-confidence promotion.
 - [ ] Test WhatsMyName stale-cache fallback.
-- [ ] Test approval with valid discovery fixture data.
-- [ ] Test approval rejects mismatched username or unsafe URL.
-- [ ] Test approval does not create a crawl job.
+- [x] Test approval with valid discovery fixture data.
+- [x] Test approval rejects mismatched username or unsafe URL.
+- [x] Test approval does not create a crawl job.
 
 ### A4 — Optional enrichment boundary
 
