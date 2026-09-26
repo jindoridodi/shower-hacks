@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #fff8f0;
+  --color-bg-card: #ffffff;
+  --color-bg-input: #fff3e8;
+  --color-bg-hover: #ffe8d6;
+
+  --color-freaky-red: #e63946;
+  --color-freaky-pink: #ff6b8a;
+  --color-freaky-blush: #ffb4c2;
+  --color-freaky-peach: #ffcdb2;
+  --color-freaky-blue: #6ec6ca;
+  --color-freaky-purple: #b57bee;
+  --color-freaky-yellow: #ffe066;
+  --color-freaky-dark: #1a1a2e;
+
+  --color-text-main: #1a1a2e;
+  --color-text-secondary: #555;
+  --color-text-muted: #999;
+  --color-border: #f0ddd0;
+
+  --font-display: "Comic Neue", "Comic Sans MS", cursive, sans-serif;
+  --font-body: "Nunito", "Quicksand", ui-rounded, system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+}
+
+@font-face {
+  font-family: "Comic Neue";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/comicneue/v8/4UaHrEJDsxBroc5i8LdFo54.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Comic Neue";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/comicneue/v8/4UaErEJDsxBroc5i8LdFo50WeR42.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshdTQ3j6zbXWjgeg.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshdbk0j6zbXWjgeg.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/nunito/v26/XRXI3I6Li01BKofiOc5wtlZ2di8HDLshdTo0j6zbXWjgeg.woff2") format("woff2");
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-main);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background-color: var(--color-freaky-blush);
+  color: var(--color-freaky-dark);
+}
+
+@keyframes wiggle {
+  0%, 100% { transform: rotate(-2deg); }
+  50% { transform: rotate(2deg); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes peek {
+  0%, 100% { transform: translateX(0) rotate(0); }
+  25% { transform: translateX(4px) rotate(2deg); }
+  75% { transform: translateX(-4px) rotate(-2deg); }
+}
+
+@keyframes pop-in {
+  0% { transform: scale(0.8); opacity: 0; }
+  60% { transform: scale(1.05); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-wiggle { animation: wiggle 2s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+.animate-peek { animation: peek 3s ease-in-out infinite; }
+.animate-pop-in { animation: pop-in 0.4s ease-out forwards; }
