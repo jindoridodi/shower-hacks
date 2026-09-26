@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from apps.api.services.discovery.models import DiscoveryRequest, DiscoveryResponse
 from apps.api.services.discovery.service import DiscoveryService
-from apps.api.services.sources.repository import ProjectNotFoundError
+from apps.api.services.manual_sources.repository import ProjectNotFoundError
 
 router = APIRouter(prefix="/api", tags=["discovery"])
 

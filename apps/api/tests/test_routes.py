@@ -1,10 +1,13 @@
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 from fastapi.testclient import TestClient
 
 from apps.api.main import create_app
 from apps.api.services.discovery.providers.explicit_url import ExplicitUrlProvider
 from apps.api.services.discovery.providers.fixture import FixtureProvider
 from apps.api.services.discovery.service import DiscoveryService
-from apps.api.services.sources.repository import SQLiteSourceRepository
+from apps.api.services.manual_sources.repository import SQLiteSourceRepository
 
 
 def make_client() -> TestClient:
@@ -19,13 +22,25 @@ def make_client() -> TestClient:
         use_fixtures=True,
         source_repository=source_repository,
     )
-    return TestClient(create_app(service, source_repository))
+    database_dir = TemporaryDirectory()
+    database_path = Path(database_dir.name) / "test.db"
+    client = TestClient(
+        create_app(
+            database_path,
+            discovery_service=service,
+            source_repository=source_repository,
+        )
+    )
+    client.database_dir = database_dir  # keep temp dir alive for the client lifetime
+    return client
 
 
 def test_health() -> None:
     response = make_client().get("/api/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    body = response.json()
+    assert body["status"] == "ok"
+    assert "llmConfigured" in body
 
 
 def test_osint_test_ui_is_served_from_root() -> None:

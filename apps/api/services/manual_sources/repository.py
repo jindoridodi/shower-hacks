@@ -10,7 +10,7 @@ from pathlib import Path
 
 from apps.api.services.discovery.models import SavedSource
 from apps.api.services.discovery.normalize import normalize_url, platform_for_url
-from apps.api.services.sources.models import Project
+from apps.api.services.manual_sources.models import Project
 
 
 class ProjectNotFoundError(LookupError):
@@ -26,9 +26,10 @@ class DuplicateSourceError(ValueError):
 
 
 def database_path_from_environment() -> str:
-    database_url = os.getenv("DATABASE_URL", "sqlite:///./data/borrowed_intimacy.db")
+    # Keep OSINT manual-source storage off the main migrated database.
+    database_url = os.getenv("OSINT_DATABASE_URL", "sqlite:///./data/osint_sources.db")
     if not database_url.startswith("sqlite:///"):
-        raise ValueError("DATABASE_URL must use sqlite:///...")
+        raise ValueError("OSINT_DATABASE_URL must use sqlite:///...")
     return database_url.removeprefix("sqlite:///")
 
 

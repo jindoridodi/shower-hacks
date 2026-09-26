@@ -14,7 +14,7 @@ from apps.api.services.discovery.providers.maigret import MaigretProvider
 from apps.api.services.discovery.providers.sherlock import SherlockProvider
 from apps.api.services.discovery.providers.whatsmyname import WhatsMyNameProvider
 from apps.api.services.discovery.scoring import candidates_from_records, provider_evidence_from_records
-from apps.api.services.sources.repository import SQLiteSourceRepository
+from apps.api.services.manual_sources.repository import SQLiteSourceRepository
 
 
 def _enabled(value: str | None) -> bool:
