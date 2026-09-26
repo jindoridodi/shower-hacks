@@ -70,6 +70,31 @@ def test_document_content_hash_deduplication(client, session):
     assert session.scalar(select(func.count()).select_from(Document).where(Document.source_id == source["id"])) == 2
 
 
+def test_dedup_points_the_source_at_the_reingested_document(client):
+    project = create_project(client)
+    source = create_source(client, project["id"], "https://example.com/reseen")
+    first = client.post(
+        "/documents",
+        json={"source_id": source["id"], "cleaned_text": "First public page"},
+    )
+    second = client.post(
+        "/documents",
+        json={"source_id": source["id"], "cleaned_text": "Second public page"},
+    )
+    assert first.status_code == 201
+    assert second.status_code == 201
+    assert client.get(f"/sources/{source['id']}").json()["content_hash"] == second.json()["content_hash"]
+
+    again = client.post(
+        "/documents",
+        json={"source_id": source["id"], "cleaned_text": "First public page"},
+    )
+    assert again.status_code == 200
+    assert again.json()["deduplicated"] is True
+    assert again.json()["id"] == first.json()["id"]
+    assert client.get(f"/sources/{source['id']}").json()["content_hash"] == first.json()["content_hash"]
+
+
 def test_same_content_on_another_source_is_stored_again(client, session):
     project = create_project(client)
     first = create_source(client, project["id"], "https://example.com/one")

@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Borrowed Intimacy — OSINT Test</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --paper: #f5f3ee;
+        --ink: #171717;
+        --muted: #6c6a65;
+        --line: #d2cec4;
+        --accent: #ff4d00;
+        --low: #e7dd78;
+        --medium: #f8b65b;
+        --high: #93d19a;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: var(--paper);
+        color: var(--ink);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      main { max-width: 820px; margin: 0 auto; padding: 48px 24px 72px; }
+      header { border-bottom: 2px solid var(--ink); padding-bottom: 28px; margin-bottom: 22px; }
+      h1 { font-family: Georgia, serif; font-size: clamp(2.5rem, 7vw, 5.5rem); font-weight: 400; letter-spacing: -0.065em; line-height: .86; margin: 0; }
+      h1 span { color: var(--accent); }
+      .lede { color: var(--muted); font-size: .9rem; line-height: 1.5; margin: 20px 0 0; max-width: 620px; }
+      form { display: grid; gap: 16px; }
+      .provider { color: var(--muted); font-size: .78rem; margin: 0 0 10px; }
+      .input-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+      input, button { border: 1px solid var(--ink); border-radius: 0; font: inherit; }
+      input { background: #fffefa; padding: 15px; width: 100%; }
+      button { background: var(--ink); color: white; cursor: pointer; font-size: .82rem; padding: 15px 18px; }
+      button:hover { background: var(--accent); border-color: var(--accent); }
+      button:disabled { cursor: wait; opacity: .65; }
+      #status { color: var(--muted); font-size: .78rem; min-height: 20px; margin: 20px 0 12px; }
+      #status.error { color: #a21b00; }
+      #status.success { color: #226b2c; }
+      #results { border-top: 1px solid var(--line); }
+      .result-head { align-items: baseline; display: flex; justify-content: space-between; gap: 16px; padding: 16px 0; }
+      .result-head h2 { font-size: .78rem; font-weight: 400; letter-spacing: .05em; margin: 0; text-transform: uppercase; }
+      .candidate { border-top: 1px solid var(--line); display: grid; gap: 10px; padding: 20px 0; }
+      .candidate.selected { background: #fff1e9; margin-inline: -12px; padding-inline: 12px; }
+      .candidate-top { align-items: center; display: flex; flex-wrap: wrap; gap: 8px; }
+      .candidate a { color: var(--ink); font-family: Georgia, serif; font-size: 1.25rem; overflow-wrap: anywhere; text-decoration-color: var(--accent); text-decoration-thickness: 2px; }
+      .badge { border-radius: 999px; font-size: .68rem; padding: 4px 7px; text-transform: uppercase; }
+      .high { background: var(--high); }
+      .medium { background: var(--medium); }
+      .low { background: var(--low); }
+      .reason, .warning { color: var(--muted); font-size: .78rem; line-height: 1.5; }
+      .warning { border-left: 3px solid var(--accent); margin: 8px 0; padding-left: 10px; }
+      .empty { color: var(--muted); padding: 28px 0; }
+      .hidden { display: none; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+      .actions button { padding: 10px 12px; }
+      .secondary { background: transparent; color: var(--ink); }
+      .secondary:hover { color: white; }
+      .enrichment { border-top: 2px solid var(--ink); margin-top: 32px; padding-top: 18px; }
+      .enrichment h2 { font-size: .82rem; font-weight: 400; letter-spacing: .05em; margin: 0 0 8px; text-transform: uppercase; }
+      .enrichment p { color: var(--muted); font-size: .78rem; line-height: 1.5; }
+      .module-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+      .module-list label { border: 1px solid var(--line); font-size: .72rem; padding: 7px; }
+      .module-list input { width: auto; }
+      .project-panel { background: #fffefa; border: 1px solid var(--line); margin: 18px 0 24px; padding: 14px; }
+      .manual-source { background: #fffefa; border: 1px solid var(--line); margin-top: 22px; padding: 16px; }
+      .project-panel h2, .manual-source h2 { font-size: .78rem; font-weight: 400; letter-spacing: .05em; margin: 0 0 12px; text-transform: uppercase; }
+      .project-row { align-items: center; display: grid; gap: 10px; grid-template-columns: 1fr auto; }
+      .project-create { margin-top: 10px; }
+      select { background: #fffefa; border: 1px solid var(--ink); border-radius: 0; font: inherit; padding: 12px; width: 100%; }
+      .remove-source { color: #a21b00; }
+      .saved-note { color: #226b2c; }
+      footer { color: var(--muted); font-size: .7rem; margin-top: 44px; }
+      @media (max-width: 560px) { .input-row, .project-row { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Borrowed<br /><span>Intimacy</span></h1>
+        <p class="lede">A small interface for testing public-source candidate discovery. It finds possible URLs; it does not crawl or accept them automatically.</p>
+      </header>
+
+      <section class="project-panel" aria-label="Project selection">
+        <h2>Working project</h2>
+        <div class="project-row">
+          <select id="project-select" aria-label="Active project"><option value="">Choose a project to save links</option></select>
+          <button id="new-project-toggle" type="button" class="secondary">new project</button>
+        </div>
+        <form id="project-create-form" class="input-row project-create hidden">
+          <input id="project-name" autocomplete="off" placeholder="project name" />
+          <button id="create-project" type="submit">create</button>
+        </form>
+        <p class="reason" id="project-status">Projects keep saved public links separate. Discovery works without one.</p>
+      </section>
+
+      <form id="discovery-form">
+        <p class="provider">Enter a username to search Sherlock, Maigret, and WhatsMyName — or paste an <code>http(s)</code> link to inspect it directly.</p>
+        <div class="input-row">
+          <input id="query" name="query" autocomplete="off" placeholder="username or https://example.com/profile" required />
+          <button id="submit" type="submit">discover</button>
+        </div>
+      </form>
+
+      <p id="status" aria-live="polite">Ready. Try <strong>demo-user</strong> in fixture mode, or a public URL.</p>
+      <section id="results" aria-live="polite"></section>
+      <section id="manual-source" class="manual-source hidden" aria-live="polite">
+        <h2>Add public link</h2>
+        <p class="reason" id="manual-source-copy"></p>
+        <form id="manual-source-form" class="input-row">
+          <input id="manual-source-url" type="url" autocomplete="url" placeholder="https://example.com/profile" required />
+          <button id="save-source" type="submit">save link</button>
+        </form>
+        <p class="reason" id="manual-source-status"></p>
+      </section>
+      <div class="actions hidden" id="graph-actions">
+        <button id="export-csv" type="button" class="secondary">export graph (CSV ZIP)</button>
+        <button id="export-gexf" type="button" class="secondary">export graph (GEXF)</button>
+      </div>
+      <section id="enrichment" class="enrichment hidden" aria-live="polite">
+        <h2>Selected-source enrichment</h2>
+        <p id="selected-source"></p>
+        <div class="module-list">
+          <label><input type="checkbox" name="sf-module" value="account_discovery" checked /> account discovery</label>
+          <label><input type="checkbox" name="sf-module" value="public_metadata" /> public metadata</label>
+          <label><input type="checkbox" name="sf-module" value="domain_provenance" /> domain provenance</label>
+        </div>
+        <div class="actions">
+          <button id="run-enrichment" type="button">run SpiderFoot</button>
+          <button id="refresh-enrichment" type="button" class="secondary hidden">refresh status</button>
+        </div>
+        <p id="enrichment-status"></p>
+        <div id="enrichment-results"></div>
+      </section>
+      <footer>Candidate URLs are suggestions. Select only the sources you intend to crawl.</footer>
+    </main>
+
+    <script>
+      const form = document.querySelector('#discovery-form');
+      const query = document.querySelector('#query');
+      const projectSelect = document.querySelector('#project-select');
+      const projectCreateForm = document.querySelector('#project-create-form');
+      const projectName = document.querySelector('#project-name');
+      const newProjectToggle = document.querySelector('#new-project-toggle');
+      const createProject = document.querySelector('#create-project');
+      const projectStatus = document.querySelector('#project-status');
+      const submit = document.querySelector('#submit');
+      const status = document.querySelector('#status');
+      const results = document.querySelector('#results');
+      const manualSource = document.querySelector('#manual-source');
+      const manualSourceForm = document.querySelector('#manual-source-form');
+      const manualSourceUrl = document.querySelector('#manual-source-url');
+      const manualSourceCopy = document.querySelector('#manual-source-copy');
+      const manualSourceStatus = document.querySelector('#manual-source-status');
+      const exportCsv = document.querySelector('#export-csv');
+      const exportGexf = document.querySelector('#export-gexf');
+      const graphActions = document.querySelector('#graph-actions');
+      const enrichment = document.querySelector('#enrichment');
+      const selectedSource = document.querySelector('#selected-source');
+      const runEnrichment = document.querySelector('#run-enrichment');
+      const refreshEnrichment = document.querySelector('#refresh-enrichment');
+      const enrichmentStatus = document.querySelector('#enrichment-status');
+      const enrichmentResults = document.querySelector('#enrichment-results');
+      let latestDiscovery = null;
+      let selectedCandidate = null;
+      let enrichmentJob = null;
+      const PROJECT_STORAGE_KEY = 'borrowed-intimacy-project-id';
+
+      function activeProjectId() { return projectSelect.value || null; }
+
+      function rememberProject() {
+        if (activeProjectId()) localStorage.setItem(PROJECT_STORAGE_KEY, activeProjectId());
+        else localStorage.removeItem(PROJECT_STORAGE_KEY);
+      }
+
+      async function loadProjects(selectedId = activeProjectId() || localStorage.getItem(PROJECT_STORAGE_KEY)) {
+        const response = await fetch('/api/projects');
+        if (!response.ok) throw new Error('Unable to load projects.');
+        const projects = await response.json();
+        projectSelect.innerHTML = '<option value="">Choose a project to save links</option>' + projects
+          .map((project) => `<option value="${escaped(project.projectId)}">${escaped(project.name)}</option>`).join('');
+        projectSelect.value = projects.some((project) => project.projectId === selectedId) ? selectedId : '';
+        projectStatus.textContent = activeProjectId()
+          ? 'Saved public links will be scoped to this project and username.'
+          : 'Projects keep saved public links separate. Discovery works without one.';
+        rememberProject();
+      }
+
+      function isUrlInput(value = query.value) {
+        return /^[a-z][a-z0-9+.-]*:\/\//i.test(value.trim());
+      }
+
+      function escaped(value) {
+        const element = document.createElement('span');
+        element.textContent = value ?? '';
+        return element.innerHTML;
+      }
+
+      function render(data) {
+        const warningMarkup = data.warnings.map((warning) => `<p class="warning">${escaped(warning)}</p>`).join('');
+        if (!data.candidates.length) {
+          results.innerHTML = `<div class="result-head"><h2>Candidate sources</h2><span>0 found</span></div>${warningMarkup}<p class="empty">No candidate URLs were found for this query.</p>`;
+          return;
+        }
+        const savedByUrl = new Map((data.savedSources || []).map((source) => [source.url, source]));
+        const candidates = data.candidates.map((candidate) => {
+          const saved = savedByUrl.get(candidate.url);
+          return `
+          <article class="candidate ${selectedCandidate?.url === candidate.url ? 'selected' : ''}">
+            <div class="candidate-top">
+              <span class="badge ${escaped(candidate.confidence)}">${escaped(candidate.confidence)}</span>
+              <span class="badge">${escaped(candidate.platform)}</span>
+            </div>
+            <a href="${escaped(candidate.url)}" target="_blank" rel="noreferrer">${escaped(candidate.url)}</a>
+            <div class="reason">${escaped(candidate.matchReason)} · evidence: ${escaped((data.providerEvidence[candidate.url] || []).join(', ') || 'direct input')}</div>
+            <div class="actions"><button type="button" class="secondary select-source" data-url="${escaped(candidate.url)}">select source</button>${saved ? `<button type="button" class="secondary remove-source" data-source-id="${escaped(saved.sourceId)}">remove saved link</button>` : ''}</div>
+          </article>
+        `;
+        }).join('');
+        results.innerHTML = `<div class="result-head"><h2>Candidate sources</h2><span>${data.candidates.length} found · ${escaped(data.providersUsed.join(', '))}</span></div>${warningMarkup}${candidates}`;
+      }
+
+      function updateManualSourceForm(isUrl, data) {
+        const canSave = !isUrl && Boolean(activeProjectId()) && Boolean(data);
+        manualSource.classList.toggle('hidden', !canSave);
+        if (!canSave) return;
+        manualSourceCopy.textContent = `Attach any direct public HTTP(S) link to ${data.query} in the selected project. It is saved as user-supplied, not identity-verified.`;
+      }
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const isUrl = isUrlInput();
+        const body = { query: query.value.trim() };
+        if (!isUrl && activeProjectId()) body.projectId = activeProjectId();
+
+        submit.disabled = true;
+        status.className = '';
+        status.textContent = 'Looking for candidate sources…';
+        results.innerHTML = '';
+        graphActions.classList.toggle('hidden', isUrl);
+        if (isUrl) manualSource.classList.add('hidden');
+        try {
+          const response = await fetch('/api/discovery', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          const data = await response.json();
+          if (!response.ok) {
+            const message = data.detail?.map((error) => error.msg).join(' ') || 'Discovery request failed.';
+            throw new Error(message);
+          }
+          status.className = data.partial ? 'error' : 'success';
+          status.textContent = data.partial ? 'Discovery completed with warnings.' : 'Discovery complete.';
+          latestDiscovery = data;
+          if (!isUrl) {
+            graphActions.classList.remove('hidden');
+          }
+          render(data);
+          updateManualSourceForm(isUrl, data);
+        } catch (error) {
+          status.className = 'error';
+          status.textContent = error.message || 'Unable to reach the discovery service.';
+        } finally {
+          submit.disabled = false;
+        }
+      });
+
+      results.addEventListener('click', (event) => {
+        const remove = event.target.closest('.remove-source');
+        if (remove) {
+          removeSavedSource(remove.dataset.sourceId);
+          return;
+        }
+        const button = event.target.closest('.select-source');
+        if (!button || !latestDiscovery) return;
+        selectedCandidate = latestDiscovery.candidates.find((candidate) => candidate.url === button.dataset.url);
+        enrichmentJob = null;
+        enrichment.classList.remove('hidden');
+        selectedSource.textContent = `Selected public source: ${selectedCandidate.url}`;
+        enrichmentStatus.textContent = 'Choose bounded modules, then explicitly start SpiderFoot.';
+        enrichmentResults.innerHTML = '';
+        refreshEnrichment.classList.add('hidden');
+        render(latestDiscovery);
+      });
+
+      newProjectToggle.addEventListener('click', () => {
+        projectCreateForm.classList.toggle('hidden');
+        if (!projectCreateForm.classList.contains('hidden')) projectName.focus();
+      });
+
+      projectCreateForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const name = projectName.value.trim();
+        if (!name) { projectStatus.textContent = 'Enter a project name.'; return; }
+        createProject.disabled = true;
+        try {
+          const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+          const project = await response.json();
+          if (!response.ok) throw new Error(project.detail || 'Project creation failed.');
+          projectName.value = '';
+          await loadProjects(project.projectId);
+          projectCreateForm.classList.add('hidden');
+          if (latestDiscovery && !isUrlInput()) form.requestSubmit();
+        } catch (error) {
+          projectStatus.textContent = error.message || 'Project creation failed.';
+        } finally {
+          createProject.disabled = false;
+        }
+      });
+
+      projectSelect.addEventListener('change', () => {
+        rememberProject();
+        projectStatus.textContent = activeProjectId() ? 'Saved public links will be scoped to this project and username.' : 'Projects keep saved public links separate. Discovery works without one.';
+        if (latestDiscovery && !isUrlInput()) form.requestSubmit();
+        else if (latestDiscovery) updateManualSourceForm(isUrlInput(), latestDiscovery);
+      });
+
+      manualSourceForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        if (!latestDiscovery || !activeProjectId() || isUrlInput()) return;
+        const button = document.querySelector('#save-source');
+        button.disabled = true;
+        manualSourceStatus.textContent = 'Saving public link…';
+        try {
+          const response = await fetch(`/api/projects/${encodeURIComponent(activeProjectId())}/sources`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: latestDiscovery.query, url: manualSourceUrl.value.trim() }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'Unable to save this link.');
+          manualSourceUrl.value = '';
+          manualSourceStatus.textContent = 'Saved. Refreshing candidates…';
+          form.requestSubmit();
+        } catch (error) {
+          manualSourceStatus.textContent = error.message || 'Unable to save this link.';
+        } finally {
+          button.disabled = false;
+        }
+      });
+
+      async function removeSavedSource(sourceId) {
+        if (!activeProjectId() || !sourceId) return;
+        try {
+          const response = await fetch(`/api/projects/${encodeURIComponent(activeProjectId())}/sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' });
+          if (!response.ok) { const data = await response.json(); throw new Error(data.detail || 'Unable to remove saved link.'); }
+          form.requestSubmit();
+        } catch (error) {
+          manualSourceStatus.textContent = error.message || 'Unable to remove saved link.';
+        }
+      }
+
+      async function exportGraph(format) {
+        if (!latestDiscovery) return;
+        const response = await fetch(`/api/graph/export?format=${format}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: latestDiscovery.query, candidates: latestDiscovery.candidates, providerEvidence: latestDiscovery.providerEvidence }),
+        });
+        if (!response.ok) { status.className = 'error'; status.textContent = 'Graph export failed.'; return; }
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(await response.blob());
+        link.download = format === 'csv' ? 'discovery-graph.zip' : 'discovery-graph.gexf';
+        link.click(); URL.revokeObjectURL(link.href);
+      }
+      exportCsv.addEventListener('click', () => exportGraph('csv'));
+      exportGexf.addEventListener('click', () => exportGraph('gexf'));
+
+      function selectedModules() {
+        return [...document.querySelectorAll('input[name="sf-module"]:checked')].map((input) => input.value);
+      }
+
+      runEnrichment.addEventListener('click', async () => {
+        if (!selectedCandidate) return;
+        const modules = selectedModules();
+        if (!modules.length) { enrichmentStatus.textContent = 'Select at least one bounded module.'; return; }
+        runEnrichment.disabled = true;
+        enrichmentStatus.textContent = 'Starting SpiderFoot for the selected public source…';
+        try {
+          const response = await fetch('/api/enrichment/spiderfoot', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target: selectedCandidate.url, targetType: 'url', modules }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'SpiderFoot could not start. Is the local sidecar running?');
+          enrichmentJob = data.jobId;
+          enrichmentStatus.textContent = `SpiderFoot ${data.status}: ${data.jobId}`;
+          refreshEnrichment.classList.remove('hidden');
+        } catch (error) {
+          enrichmentStatus.textContent = error.message || 'SpiderFoot request failed.';
+        } finally {
+          runEnrichment.disabled = false;
+        }
+      });
+
+      refreshEnrichment.addEventListener('click', async () => {
+        if (!enrichmentJob || !selectedCandidate) return;
+        enrichmentStatus.textContent = 'Refreshing SpiderFoot status…';
+        try {
+          const response = await fetch(`/api/enrichment/spiderfoot/${encodeURIComponent(enrichmentJob)}?target=${encodeURIComponent(selectedCandidate.url)}`);
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || 'SpiderFoot status request failed.');
+          enrichmentStatus.textContent = `SpiderFoot ${data.status} · ${data.findings.length} public URL findings`;
+          enrichmentResults.innerHTML = data.findings.map((finding) => `<p class="reason">${escaped(finding.value)} · ${escaped(finding.confidence)}</p>`).join('') || '<p class="reason">No permitted public URL findings yet.</p>';
+        } catch (error) {
+          enrichmentStatus.textContent = error.message || 'Unable to refresh SpiderFoot status.';
+        }
+      });
+
+      loadProjects().catch((error) => { projectStatus.textContent = error.message || 'Unable to load projects.'; });
+    </script>
+  </body>
+</html>

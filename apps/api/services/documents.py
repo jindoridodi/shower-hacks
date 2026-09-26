@@ -68,6 +68,10 @@ def stage_document(
         )
     )
     if existing is not None:
+        # Re-seeing this content is the source's latest snapshot, even when the
+        # document row already exists.
+        source.content_hash = digest
+        source.updated_at = utc_now()
         return existing, False
 
     now = utc_now()

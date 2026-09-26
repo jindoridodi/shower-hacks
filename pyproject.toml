@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "borrowed-intimacy"
 version = "0.1.0"
-description = "Source, crawl, document, and evidence API for Borrowed Intimacy"
+description = "Source, crawl, discovery, document, and evidence API for Borrowed Intimacy"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -13,13 +13,15 @@ dependencies = [
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
     "sqlalchemy>=2.0.36",
-    "uvicorn>=0.32.0",
-    "certifi>=2024.8.30",
+    "uvicorn[standard]>=0.32.0",
+    "httpx>=0.27.0",
+    "networkx>=2.8,<3",
+    "sherlock-project>=0.16,<0.17",
+    "maigret>=0.5,<0.6",
 ]
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.27.0",
     "pytest>=8.3.0",
 ]
 
@@ -27,5 +29,5 @@ dev = [
 include = ["apps*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
+testpaths = ["tests", "apps/api/tests"]
 pythonpath = ["."]

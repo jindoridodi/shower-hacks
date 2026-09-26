@@ -97,6 +97,13 @@ def test_invalid_url_and_missing_project_are_clear_errors(client):
     assert invalid.status_code == 422
     assert invalid.json()["detail"]["code"] == "invalid_url"
 
+    malformed = client.post(
+        "/sources",
+        json={"project_id": project["id"], "url": "https://[bad"},
+    )
+    assert malformed.status_code == 422
+    assert malformed.json()["detail"]["code"] == "invalid_url"
+
     missing = client.post(
         "/sources",
         json={"project_id": "missing-project", "url": "https://example.com/"},

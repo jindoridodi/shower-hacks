@@ -41,10 +41,18 @@ class Settings(BaseSettings):
     crawl_allowed_urls: str = ""
     crawl_terms_accepted_hosts: str = ""
     crawl_requests_per_minute: int = 10
+    llm_api_key: str = ""
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = ""
+    llm_timeout_seconds: float = 30.0
 
     @property
     def database_path(self) -> Path:
         return database_path_from_url(self.database_url)
+
+    @property
+    def llm_configured(self) -> bool:
+        return bool(self.llm_api_key and self.llm_model)
 
 
 @lru_cache

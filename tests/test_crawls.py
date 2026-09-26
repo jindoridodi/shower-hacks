@@ -1,3 +1,7 @@
+import threading
+
+from apps.api.errors import APIError
+from apps.api.services.crawls import queue_crawl
 from tests.helpers import create_project, create_source
 
 
@@ -77,6 +81,45 @@ def test_crawl_for_missing_source_returns_404(client):
     response = client.post("/crawls", json={"source_id": "missing-source"})
     assert response.status_code == 404
     assert response.json()["detail"]["code"] == "source_not_found"
+
+
+def test_concurrent_queue_keeps_one_active_crawl(app, client):
+    project = create_project(client)
+    source = create_source(client, project["id"], "https://example.com/concurrent")
+    barrier = threading.Barrier(6)
+    jobs: list[str] = []
+    codes: list[str] = []
+    unexpected: list[BaseException] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        session = app.state.session_factory()
+        try:
+            barrier.wait(timeout=5)
+            job = queue_crawl(session, source["id"])
+            with lock:
+                jobs.append(job.id)
+        except APIError as exc:
+            with lock:
+                codes.append(exc.payload["code"])
+        except BaseException as exc:
+            with lock:
+                unexpected.append(exc)
+        finally:
+            session.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert unexpected == []
+    assert len(jobs) == 1
+    assert codes == ["crawl_already_active"] * 5
+    listed = client.get("/crawls", params={"source_id": source["id"]})
+    assert listed.status_code == 200
+    assert [item["id"] for item in listed.json()] == jobs
 
 
 def test_succeeded_crawl_rejects_an_error_message(client):

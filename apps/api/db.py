@@ -13,7 +13,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from apps.api.clock import utc_now
@@ -33,7 +33,7 @@ def _enable_foreign_keys(dbapi_connection: object, _connection_record: object) -
 def make_engine(database_path: Path) -> Engine:
     return create_engine(
         f"sqlite:///{database_path}",
-        connect_args={"check_same_thread": False},
+        connect_args={"check_same_thread": False, "timeout": 30},
     )
 
 
@@ -90,6 +90,15 @@ def transaction(db: Session) -> Iterator[None]:
             "The database rejected this write because a related record is missing "
             "or a unique value already exists.",
         ) from exc
+    except OperationalError as exc:
+        db.rollback()
+        if "locked" in str(exc).lower() or "busy" in str(exc).lower():
+            raise APIError(
+                503,
+                "database_busy",
+                "The database is busy. Retry the request.",
+            ) from exc
+        raise
     except Exception:
         db.rollback()
         raise

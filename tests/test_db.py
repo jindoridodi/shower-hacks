@@ -22,18 +22,19 @@ REQUIRED_TABLES = {
 }
 
 
-def test_schema_snapshot_matches_initial_migration():
+def test_schema_snapshot_matches_migrations():
     root = repo_root()
     schema = (root / "db" / "schema.sql").read_text(encoding="utf-8")
-    migration = (root / "db" / "migrations" / "001_initial.sql").read_text(encoding="utf-8")
-    assert schema == migration
+    migrations = sorted((root / "db" / "migrations").glob("*.sql"))
+    combined = "".join(path.read_text(encoding="utf-8") for path in migrations)
+    assert schema == combined
 
 
 def test_migrations_are_repeatable_and_create_tables(tmp_path):
     database_path = tmp_path / "app.db"
     first = apply_migrations(database_path)
     second = apply_migrations(database_path)
-    assert first == ["001_initial", "002_raw_document_contract"]
+    assert first == ["001_initial", "002_raw_document_contract", "002_uniqueness"]
     assert second == []
 
     connection = sqlite3.connect(database_path)
@@ -48,10 +49,16 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
             row[0]
             for row in connection.execute("SELECT version FROM schema_migrations ORDER BY version")
         ]
+        indexes = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'index'")
+        }
     finally:
         connection.close()
     assert REQUIRED_TABLES <= names
-    assert versions == ["001_initial", "002_raw_document_contract"]
+    assert versions == ["001_initial", "002_raw_document_contract", "002_uniqueness"]
+    assert "uq_report_claims_report_position" in indexes
+    assert "uq_crawl_jobs_one_active" in indexes
 
 
 def test_create_app_can_open_the_same_database_twice(tmp_path):

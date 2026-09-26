@@ -1,0 +1,23 @@
+[
+  {
+    "sourceId": "src_portfolio",
+    "sourceTitle": "Avery Chen — Portfolio",
+    "sourceUrl": "https://example.test/avery-portfolio",
+    "text": "I am a designer and researcher based in Portland. My current work explores public archives and community storytelling.",
+    "sensitivityStatus": "safe"
+  },
+  {
+    "sourceId": "src_talk",
+    "sourceTitle": "Designing With Public Records",
+    "sourceUrl": "https://example.test/avery-talk",
+    "text": "On March 14, 2025, Avery Chen presented Designing With Public Records at the Open Archives Symposium.",
+    "sensitivityStatus": "safe"
+  },
+  {
+    "sourceId": "src_project",
+    "sourceTitle": "Neighborhood Memory Map",
+    "sourceUrl": "https://example.test/neighborhood-memory-map",
+    "text": "Neighborhood Memory Map is a 2024 project that combines oral-history excerpts with photographs from local public collections.",
+    "sensitivityStatus": "safe"
+  }
+]
