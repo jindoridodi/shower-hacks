@@ -38,7 +38,7 @@ borrowed-intimacy/
 │       │   └── reports.py
 │       ├── services/
 │       │   ├── firecrawl.py         # Public-page ingestion
-│       │   ├── discovery.py         # Optional username discovery
+│       │   ├── discovery.py         # Always-on public username discovery
 │       │   ├── cleaner.py
 │       │   ├── sensitivity.py       # Sensitive-data detection/filtering
 │       │   ├── chunker.py
@@ -83,7 +83,7 @@ borrowed-intimacy/
 │   ├── test_retrieval.py
 │   └── test_reports.py
 ├── .env.example
-├── docker-compose.yml
+├── infra/spiderfoot/docker-compose.yml
 ├── package.json
 ├── pyproject.toml
 └── README.md
@@ -100,9 +100,10 @@ borrowed-intimacy/
 ### Collection and processing
 
 - **Web crawling:** Firecrawl API for public-page scraping and crawl jobs
-- **Optional discovery:** Sherlock or Maigret for suggesting publicly visible profile URLs
+- **Username discovery:** Sherlock, Maigret, WhatsMyName, and Namechk for suggesting and cross-checking publicly visible profile URLs
 - **Browser fallback:** Playwright for public pages that require client-side rendering
-- **Text extraction:** Firecrawl Markdown output with local normalization and chunking
+- **Text extraction:** Firecrawl Markdown output, trafilatura, local normalization, and chunking
+- **Historical pages:** Wayback Machine CDX API and Common Crawl as optional archival sources
 - **Sensitive-data handling:** Presidio and custom detection rules
 
 ### Storage and retrieval
@@ -110,9 +111,11 @@ borrowed-intimacy/
 - **Primary database:** SQLite
 - **Text search:** SQLite FTS5
 - **Vector search:** `sqlite-vec` or a simple in-process embedding index
+- **Optional search services:** Meilisearch or OpenSearch for larger installations
 - **Object storage:** Local filesystem during development; S3-compatible storage in production
 - **Background jobs:** Redis with Celery or BullMQ
-- **Graph visualization:** React Flow in the application, with Gephi available for offline exploration
+- **Semantic search alternatives:** Qdrant or Chroma if SQLite vector search is insufficient
+- **Graph visualization:** React Flow in the application, with Gephi or Maltego available for offline exploration
 
 ### Generation
 
@@ -120,6 +123,13 @@ borrowed-intimacy/
 - **Embeddings:** Provider embeddings or a local sentence-transformer model
 - **Retrieval pattern:** Evidence-constrained retrieval-augmented generation
 - **Output formats:** Factual profiles, relationship summaries, uncertainty reports, source-collision views, and reviewed communication drafts
+
+### Optional media and metadata tools
+
+- **Metadata inspection:** ExifTool for public image and document metadata
+- **Public media archiving:** yt-dlp only for explicitly public media and permitted use
+- **Public place context:** OpenStreetMap/Nominatim for interpreting places already named in public sources; never for locating a person
+- **OSINT correlation:** SpiderFoot with breach, phone, dark-web, and precise-location modules disabled
 
 ### Infrastructure
 
@@ -163,7 +173,7 @@ Factual report
 Source ledger and uncertainty view
 ```
 
-An optional `discovery.py` adapter may use Sherlock or Maigret to suggest publicly visible profile URLs. Suggested URLs must be reviewed and added to the crawl allowlist; the core application must also work with a manually supplied URL list.
+The discovery service runs Sherlock, Maigret, and WhatsMyName for username queries to suggest publicly visible profile URLs. Suggested URLs must be reviewed and added to the crawl allowlist; manually supplied public URLs use the direct-input path.
 
 ## Suggested database tables
 
@@ -208,6 +218,107 @@ FIRECRAWL_API_KEY=
 DATABASE_URL=sqlite:///./data/borrowed_intimacy.db
 REDIS_URL=redis://localhost:6379/0
 LLM_API_KEY=
+OSINT_USE_FIXTURES=false # Fixture data is for offline tests/demos only.
+SHERLOCK_SITE_TIMEOUT_SECONDS=10
+SHERLOCK_PROCESS_TIMEOUT_SECONDS=45
+MAIGRET_SITE_TIMEOUT_SECONDS=10
+MAIGRET_PROCESS_TIMEOUT_SECONDS=60
+MAIGRET_MAX_SITES=500
+WHATS_MY_NAME_DATA_URL=https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json
+WHATS_MY_NAME_CACHE_TTL_SECONDS=86400
+WHATS_MY_NAME_SITE_TIMEOUT_SECONDS=8
+WHATS_MY_NAME_MAX_CONCURRENCY=20
+SPIDERFOOT_BASE_URL=http://127.0.0.1:5001
+```
+
+## How to run the OSINT test service
+
+The OSINT service includes a small browser interface and a JSON API for testing candidate URL discovery. It does not crawl discovered URLs. The UI can create local projects and save any direct public HTTP(S) URL against a username; those saved links are kept in SQLite and merge into later searches for the same project and username.
+
+### 1. Create the local environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+```
+
+### 2. Run in fixture mode
+
+Fixture mode uses the predictable demo data in `data/fixtures/candidates.json`. It is the best choice for frontend work and offline demos.
+
+```bash
+OSINT_USE_FIXTURES=true python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
+
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) to use the browser test UI, or test the API directly:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/discovery \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"demo-user"}'
+```
+
+To use persistent saved links, create a project, then add a URL for a username:
+
+```bash
+PROJECT_ID=$(curl -sS -X POST http://127.0.0.1:8000/api/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"demo"}' | python -c 'import json,sys; print(json.load(sys.stdin)["projectId"])')
+
+curl -X POST "http://127.0.0.1:8000/api/projects/$PROJECT_ID/sources" \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"demo-user","url":"https://example.com/profile"}'
+
+curl -X POST http://127.0.0.1:8000/api/discovery \
+  -H 'Content-Type: application/json' \
+  -d "{\"query\":\"demo-user\",\"projectId\":\"$PROJECT_ID\"}"
+```
+
+`data/borrowed_intimacy.db` is local runtime state and is intentionally ignored by Git.
+
+### 3. Run live public-profile discovery
+
+Stop the fixture server with `Ctrl+C`, then run:
+
+```bash
+OSINT_USE_FIXTURES=false python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+```
+
+Every username query runs Sherlock, Maigret, and WhatsMyName. A provider failure is reported as a warning while successful providers still return candidate URLs.
+
+Test a public username:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/discovery \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"openai","limit":5}'
+```
+
+Live results are candidate username matches, not verified identity matches.
+
+### 4. Run selected-source SpiderFoot enrichment
+
+Start the local SpiderFoot v4.0 sidecar. The repository provides an Apple-Silicon-compatible wrapper because SpiderFoot's upstream v4.0 Alpine/Python 3.8 image cannot build its pinned PyYAML dependency on ARM.
+
+```bash
+docker compose -f infra/spiderfoot/docker-compose.yml up --build -d
+```
+
+After discovery, send only a source you explicitly selected:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/enrichment/spiderfoot \
+  -H 'Content-Type: application/json' \
+  -d '{"target":"demo-user","targetType":"username","modules":["account_discovery"]}'
+```
+
+SpiderFoot findings are not candidates automatically and never trigger Firecrawl.
+
+### 5. Run automated tests
+
+```bash
+python -m pytest
 ```
 
 ### Development order
