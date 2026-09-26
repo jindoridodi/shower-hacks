@@ -11,7 +11,7 @@ from apps.api.config import get_settings
 from apps.api.db import apply_migrations, make_engine, make_session_factory
 from apps.api.dependencies import get_db
 from apps.api.errors import APIError
-from apps.api.routes import crawls, documents, projects, reports, sources
+from apps.api.routes import crawls, documents, instagram, projects, reports, sources
 
 
 def create_app(database_path: Path | None = None) -> FastAPI:
@@ -29,6 +29,7 @@ def create_app(database_path: Path | None = None) -> FastAPI:
     app.include_router(projects.router)
     app.include_router(sources.router)
     app.include_router(crawls.router)
+    app.include_router(instagram.router)
     app.include_router(documents.router)
     app.include_router(reports.router)
     _register_handlers(app)

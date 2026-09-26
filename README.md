@@ -205,6 +205,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```text
 FIRECRAWL_API_KEY=
+APIFY_API_TOKEN=
 DATABASE_URL=sqlite:///./data/borrowed_intimacy.db
 REDIS_URL=redis://localhost:6379/0
 LLM_API_KEY=
@@ -229,6 +230,8 @@ Communication drafts must not claim to be written by the target, use the target'
 ## Backend slice
 
 The FastAPI service in `apps/api` covers projects, manually supplied public URLs, crawl jobs, documents, searchable chunks, and claim-to-source evidence. Pages are stored when a caller supplies text or a `ScrapedPage`. The Firecrawl client itself is a plug-in point in `apps/api/services/firecrawl.py`.
+
+`POST /instagram/profiles` accepts one public Instagram username and returns a normalized profile plus up to 10 recent caption-bearing posts from Apify's `apify/instagram-profile-scraper`. It returns image URLs but does not download or analyze images.
 
 ### Setup
 
