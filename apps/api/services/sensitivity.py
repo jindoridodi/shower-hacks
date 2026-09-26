@@ -2,7 +2,7 @@
 from dataclasses import dataclass, asdict
 import html
 import re
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qsl
 
 
 @dataclass(frozen=True)
@@ -65,3 +65,44 @@ def prepare_for_storage(raw_text: str) -> dict:
     findings = [Finding(category) for category in PATTERNS if category in categories]
     return {'raw_text': safe, 'sensitivity_status': status,
             'findings': [asdict(f) for f in findings]}
+
+
+def filter_metadata(metadata: dict | None) -> dict:
+    """Keep inspected url/title values verbatim; omit a whole unsafe value.
+
+    Other keys are not part of the metadata storage contract. Findings contain
+    only field/category labels, never input values. This is not URL authorization.
+    """
+    if metadata is None:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        raise TypeError('metadata must be a dictionary')
+    safe = {}
+    findings = []
+    for field in ('url', 'title'):
+        value = metadata.get(field)
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise TypeError(f'metadata.{field} must be a string')
+        if not value.strip():
+            continue
+        categories = {f.category for f in detect_sensitive(value)}
+        if field == 'url':
+            try:
+                parsed = urlsplit(value)
+                if parsed.scheme not in {'http', 'https'} or not parsed.hostname or any(c.isspace() for c in value):
+                    categories.add('invalid_url')
+                if parsed.username is not None or parsed.password is not None:
+                    categories.add('url_credentials')
+                # Query names can identify secrets whose values lack a known prefix.
+                for key, _ in parse_qsl(parsed.query) + parse_qsl(parsed.fragment):
+                    if re.search(r'(?i)(token|secret|password|api.?key|authorization|signature|credential)', key):
+                        categories.add('url_secret')
+            except ValueError:
+                categories.add('invalid_url')
+        if categories:
+            findings.extend({'field': field, 'category': c} for c in sorted(categories))
+        else:
+            safe[field] = value
+    return {'metadata': safe, 'metadata_findings': findings}

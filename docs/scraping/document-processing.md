@@ -37,7 +37,8 @@ When no usable blocks remain, processing returns
 `raw_text=None`, an empty cleaned body and no chunks. Skip document persistence
 when `raw_text` is None; the production schema requires a nonempty body.
 `unreviewed` means not yet inspected and is never returned by the inspection
-function. Chunking and indexing exclude it. There is no manual-review state.
+function. Processing does not create chunks for it. Main search keeps its existing
+behavior and does not apply an additional sensitivity-status filter. There is no manual-review state.
 Empty input without findings is `clear`, but has no usable body or chunks.
 
 Run the check on the original in memory before cleaning, so removing boilerplate
@@ -46,12 +47,22 @@ containing their contents. Findings expose categories only, not values or spans.
 
 ## Trista: process the original in memory once
 
-`document_id` is optional. Omitting it or passing `None` generates a UUID v4;
-an existing nonempty string ID is preserved. The result and all its chunks use
-the same ID. The input dict is not modified. Each call without an ID generates
-a new one; this is not content deduplication. The example below supplies a fixed
-ID for readability. When integrating with a DB that creates its own IDs, persist
-this ID explicitly or remap the result to the ID returned by the DB.
+`document_id` is required and must be a nonempty string supplied by the DB
+integration layer. Missing, null or invalid IDs raise ValueError. The function
+never generates IDs, queries the DB, or verifies that an ID exists; the caller
+must also verify source ownership. The result and its chunks preserve the ID.
+
+For main's current insert-generated IDs, inspect/filter the body and metadata
+BEFORE stage_document, skip empty filtered bodies, and store only filtered data.
+Then use the returned document.id for processing/chunking within the same
+transaction. Never store unfiltered content just to obtain an ID. If processing
+is repeated, keep original redaction findings/status; sanitized input alone
+cannot reconstruct them. Reused documents from deduplication also use their
+existing DB ID. This integration is now wired into main ingest_scraped_page.
+prepare_document performs filtering before the insert; process_document uses the
+returned DB ID and the original in-memory input to preserve redaction status.
+Only newly created documents get new chunks; deduplicated documents retain their
+existing chunks and stored metadata. Historical content is not reprocessed.
 
 ```python
 from apps.api.services.processing import process_document
@@ -74,6 +85,8 @@ Result (all content here is fictional):
   "cleaned_text": "# Alex\n\nEnjoys hiking.",
   "sensitivity_status": "redacted",
   "findings": [{"category": "email"}],
+  "metadata": {"url": "https://example.com/about", "title": "About Alex"},
+  "metadata_findings": [],
   "chunks": [{
     "chunk_index": 0,
     "document_id": "doc_1",
@@ -94,11 +107,23 @@ rendering evidence; do not label it a verbatim original quote. If Emily already
 filtered a document, retain her original status/findings separately: reprocessing
 safe text cannot recover the fact that redaction occurred.
 
-The input metadata is intentionally not copied into the result. URLs, titles,
-other Firecrawl fields, source records and content hashes are a separate storage
-boundary: Emily/Trista must inspect these too before persistence (including URL
-query secrets). This function filters Markdown only. Do not serialize the whole
-incoming document next to the filtered result.
+Input `metadata.url` and `metadata.title` are inspected and preserved in the
+result's `metadata` object. Missing metadata produces `{}`. Other keys are omitted.
+A detected value is omitted entirely, never partially rewritten; rejected URL
+schemes, URL credentials and recognized secret query keys are also omitted.
+`metadata_findings` records field/category labels only. Removal marks the overall
+result `redacted` while usable body text and chunks remain available.
+The detectors are heuristic: arbitrary opaque URL secrets can still be missed.
+This is not URL authorization or crawl allowlist enforcement.
+
+When integrating, pass the safe title to the document record and resolve URL
+ownership through the existing source_id. Other Firecrawl metadata and source
+records still require inspection before persistence. Do not store the incoming
+payload alongside the filtered output.
+
+The 14 standalone tests in `tests/test_sensitivity.py` cover filtering and
+processing/metadata. Main adds ingestion integration tests in test_firecrawl_stub.py
+and persistent FTS5/API tests in test_documents.py. Run main tests using pytest.
 
 ## Chunk and FTS integration
 
@@ -110,39 +135,37 @@ size is a target rather than an absolute bound. Long tables/code/links can cross
 chunk boundaries; offsets permit fetching surrounding filtered context. There
 are no invented redaction markers to fragment.
 
-```python
-import sqlite3
-from apps.api.services.retrieval import ChunkSearch
+The main ChunkCreate API preserves leading/trailing whitespace and rejects
+whitespace-only chunks. Join generated chunks in chunk_index order with
+`"".join(chunk.text for chunk in chunks)` to retain original spaces and newlines.
+Do not add spaces indiscriminately: long tokens can cross chunk boundaries.
 
-connection = sqlite3.connect(':memory:')
-index = ChunkSearch(connection)
-index.replace_document(project_id='project_1', result=result)
-hits = index.search('hiking', project_id='project_1', source_ids=['source_1'])
-connection.close()
+Production retrieval uses main's existing documents.search_chunks:
+
+```python
+from apps.api.services.documents import search_chunks
+hits = search_chunks(db, 'hiking', project_id='project_1')
 ```
 
-Hits include `document_id`, `source_id`, `chunk_index`, filtered `excerpt` and
-`evidence_basis`. The caller must resolve trusted project/source ownership and
-the subject's allowed source IDs before calling; this adapter is not an API
-authorization layer. Both scopes are applied in SQL. Denied replacements remove
-old entries for the same project/document. Reindex on status/content changes.
-
-`ChunkSearch` creates only `temp.processing_fts` on the supplied connection.
-It is disposable and must be rebuilt per connection. Its transaction commits on
-replacement, so use a dedicated connection rather than one with a pending
-application transaction. No migrations, persistent tables or storage API were
-added. Once Trista provides persistent FTS, map returned chunks into it and retain
-the same project/source restrictions and status exclusions.
+It returns chunk ID, document ID, source ID, chunk_index and text. project_id is
+optional; omitting it searches all projects. There is no additional source-ID
+allowlist or sensitivity-status filter. This retains main's existing behavior.
+The standalone retrieval.py now delegates to this function and requires main's
+services and SQLAlchemy session; the temporary ChunkSearch API was removed.
 
 ## Current connection status and limitations
 
-Cleaner → sensitivity → chunk output and chunk output → temporary FTS are tested
-locally (sensitivity runs first). Firecrawl, storage routes, persistent FTS and
-workers are currently empty and are NOT connected. The older database document
-uses `documents.content`; the agreed `raw_text` / `cleaned_text` /
-`document_chunks` schema still belongs to Trista. The older Firecrawl pipeline
-places storage before inspection: integrators must move inspection before any
-raw-body write. No production schema or other teammate's API was changed.
+Main's ingest_scraped_page calls prepare_document before any document write,
+stores only filtered Markdown and title, and creates chunks with the DB ID
+inside the same transaction. Raw HTML is not persisted in this path. Empty or
+fully removed input returns None, creates no document/chunks, marks job/source
+failed and records a fixed reason without rejected content. Callers must handle
+None; retries can queue another crawl. Processing errors roll back the insert.
+Source URLs are existing source records; this path does not rewrite them.
+Direct /documents writes retain main's existing behavior and do not automatically
+run the scraper processing pipeline. Findings and offsets are available from the
+pure processing function but do not have dedicated DB columns.
+The scraper remains a stub: no actual Firecrawl request or embedding is added.
 
 Detection separates category patterns from status policy. Supported heuristics
 cover conventional emails/phone-like numbers, labeled credentials and financial
@@ -162,5 +185,5 @@ confirmed exact lines, which are not removed inside fenced/indented code.
 FTS5 `unicode61` uses literal AND terms, without stemming or synonyms.
 Verified English examples: `HIKING` matches `Hiking`; `hike` does not.
 `robots` matches `robots`; `robot` does not. `creative projects` requires both
-terms. The adapter returns no invented evidence for unmatched queries.
+terms. Search returns no invented evidence for unmatched queries.
 Non-English search quality is outside the supported scope.
