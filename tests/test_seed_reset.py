@@ -45,7 +45,12 @@ def test_seed_is_idempotent_and_reset_clears_only_the_dev_database(tmp_path):
     try:
         assert check.scalar(select(func.count()).select_from(Project)) == 0
         versions = check.execute(text("SELECT version FROM schema_migrations")).scalars().all()
-        assert versions == ["001_initial", "002_uniqueness", "003_claim_source_excerpt"]
+        assert versions == [
+            "001_initial",
+            "002_raw_document_contract",
+            "002_uniqueness",
+            "003_claim_source_excerpt",
+        ]
     finally:
         check.close()
         reopened.dispose()
@@ -111,4 +116,3 @@ def _run(script: str, env: dict[str, str]) -> subprocess.CompletedProcess[str]:
         text=True,
         check=False,
     )
-

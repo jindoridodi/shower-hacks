@@ -143,6 +143,12 @@ CREATE TABLE IF NOT EXISTS claim_sources (
 
 CREATE INDEX IF NOT EXISTS idx_claim_sources_claim_id ON claim_sources (claim_id);
 CREATE INDEX IF NOT EXISTS idx_claim_sources_source_id ON claim_sources (source_id);
+-- Shared Source/Document/DocumentChunk contract additions.
+ALTER TABLE documents ADD COLUMN raw_path TEXT;
+ALTER TABLE document_chunks ADD COLUMN embedding TEXT;
+ALTER TABLE document_chunks ADD COLUMN fts_text TEXT NOT NULL DEFAULT '';
+
+UPDATE document_chunks SET fts_text = text WHERE fts_text = '';
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_report_claims_report_position
 ON report_claims (report_id, position);

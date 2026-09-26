@@ -18,9 +18,9 @@ Corpus sources live in `sources`. A source has no `title` or `source_type` colum
 
 ## Document and chunk
 
-`documents.raw_text` is the stored body. Ingest writes scraped HTML there and cleaned markdown in `documents.cleaned_text`. A filesystem `raw_path` is not part of the contract.
+`documents.raw_text` stores scraped HTML when a caller supplies it. Cleaned markdown is `documents.cleaned_text`. Ingest also writes that markdown to `data/raw/{source_id}/{hash}.md` and stores the repo-relative path in `documents.raw_path`.
 
-`document_chunks.text` is the searchable chunk. The FTS5 table `document_chunks_fts` is the search index. Callers search with `GET /search/chunks`. There is no `fts_text` column and no `embedding` column.
+`document_chunks.text` is the chunk body. `document_chunks.fts_text` copies that body for the shared chunk contract. Search still reads the FTS5 table `document_chunks_fts` through `GET /search/chunks`. `document_chunks.embedding` is present and nullable; this milestone does not generate or query embeddings.
 
 Document sensitivity is `unreviewed`, `clear`, `sensitive`, or `redacted`. New scraped documents stay `unreviewed` until a later review marks them.
 

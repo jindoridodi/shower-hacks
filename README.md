@@ -215,6 +215,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```text
 FIRECRAWL_API_KEY=
+APIFY_API_TOKEN=
 DATABASE_URL=sqlite:///./data/borrowed_intimacy.db
 REDIS_URL=redis://localhost:6379/0
 LLM_API_KEY=
@@ -340,6 +341,8 @@ Communication drafts must not claim to be written by the target, use the target'
 ## Backend slice
 
 The FastAPI service in `apps/api` covers projects, manually supplied public URLs, crawl jobs, documents, searchable chunks, and claim-to-source evidence. Pages are stored when a caller supplies text or a `ScrapedPage`. The Firecrawl client itself is a plug-in point in `apps/api/services/firecrawl.py`.
+
+`POST /instagram/profiles` accepts one public Instagram username and returns a normalized profile plus up to 10 recent caption-bearing posts from Apify's `apify/instagram-profile-scraper`. It returns image URLs but does not download or analyze images.
 
 ### Setup
 
@@ -476,20 +479,22 @@ Every claim-source row stores an excerpt. The source must belong to the report's
 
 ### Firecrawl follow-up
 
-`get_public_page_scraper()` returns a stub. Implementing the client means:
-
-1. Satisfy `PublicPageScraper.scrape_public_url(url) -> ScrapedPage` for a publicly accessible page.
-2. Have a worker load a `queued` crawl, call the scraper with `sources.canonical_url`, then call `ingest_scraped_page`.
-3. On a scraper exception, `PATCH /crawls/{id}` with `{"status": "failed", "error_message": "..."}`.
-4. Keep the client limited to a URL. The protocol has no cookie, session, or credential argument.
-5. Honor robots directives, rate limits, and site terms in that client.
-6. Handle redirects explicitly. `ingest_scraped_page` accepts a page only when its URL canonicalizes to the source URL.
-7. Chunking and sensitivity classification stay outside ingest. The stored document remains `unreviewed` until a later filter updates `sensitivity_status`.
+`get_public_page_scraper()` returns `FirecrawlPublicPageScraper` when `FIRECRAWL_API_KEY` is set, and a stub that raises `FirecrawlNotConfiguredError` otherwise. The configured client only scrapes URLs listed in `CRAWL_ALLOWED_URLS` whose hosts are listed in `CRAWL_TERMS_ACCEPTED_HOSTS`. It checks robots.txt, rate-limits requests, and retries transient Firecrawl errors. `run_queued_crawl` loads a queued job, scrapes `sources.url`, and calls `ingest_scraped_page`. A scraper exception marks the job `failed`. `ingest_scraped_page` still accepts a page only when its URL canonicalizes to the source URL, and the stored document remains `unreviewed`.
 
 The corpus contract is documented in `docs/04-integration-contract.md`. Crawl jobs use `queued`, `running`, `succeeded`, and `failed`. `complete` and `partial` are not crawl statuses. Corpus errors use `{"detail": {"code", "message"}}`. `POST /api/projects` remains the OSINT project route and writes a different database. `POST /api/projects/{project_id}/reports/persisted` stores a generated report; `POST /api/projects/{project_id}/reports` only generates one.
 
-Stored pages use `documents.raw_text` and `documents.cleaned_text`. Chunks use `document_chunks.text`, and search reads `document_chunks_fts`. There is no `raw_path`, `fts_text`, or `embedding` column.
+Stored pages use `documents.raw_text`, `documents.cleaned_text`, and `documents.raw_path` for the markdown file written at ingest. Chunks use `document_chunks.text` and `document_chunks.fts_text`. Search reads `document_chunks_fts`. `document_chunks.embedding` is stored as null until an embedding worker exists.
 
 ## License
+
+### People search handoff
+
+The current Firecrawl search implementation is intentionally deferred to the
+other branch. The latest candidate URL fixture is
+[`documents/people-search-urls.json`](documents/people-search-urls.json). It
+contains the URLs to feed into the merged search/scrape workflow later.
+
+The shared output contract remains documented in
+[`docs/tests/people-search-schema.md`](docs/tests/people-search-schema.md).
 
 Add the project’s license before public release.

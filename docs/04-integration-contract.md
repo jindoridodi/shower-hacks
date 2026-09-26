@@ -104,7 +104,9 @@ Sensitivity values `sensitive`, `restricted`, and `redacted` are rejected. A cit
 
 ## Schema names
 
-`documents.raw_text` is the stored page body. There is no `documents.raw_path`. `document_chunks.text` is the chunk body. Search uses the `document_chunks_fts` virtual table, which is kept in sync by triggers. There is no `document_chunks.fts_text` column and no `document_chunks.embedding` column. Embeddings and vector search are outside this milestone.
+`documents.raw_text` stores optional raw HTML. `documents.cleaned_text` stores cleaned markdown. `documents.raw_path` is the repo-relative file written during ingest. `document_chunks.text` is the chunk body, and `document_chunks.fts_text` stores the same text for the shared chunk contract. Search uses `document_chunks_fts` through `GET /search/chunks`. `document_chunks.embedding` exists and stays null until a later embedding milestone.
+
+`POST /instagram/profiles` reads one public Instagram username through Apify. It is not part of the corpus crawl flow.
 
 ## Discovery response
 
