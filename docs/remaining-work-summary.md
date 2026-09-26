@@ -2,18 +2,18 @@
 
 ## Current status
 
-The backend foundation is substantially present. OSINT discovery and Instagram profile extraction exist as API capabilities, but the main frontend and end-to-end workflow are not complete.
+The backend foundation is substantially present. A runnable branded frontend prototype now exists, including search UI, local saved profiles, a profile-to-`love-letters` flow, and fixture-driven personalization views. OSINT discovery and Instagram profile extraction exist as API capabilities, but the frontend is not yet connected to those live APIs and the end-to-end workflow is not complete.
 
 ## Frontend
 
-- Set up the Next.js/TypeScript frontend runtime; `package.json` is currently empty.
-- Build the landing page and project workflow.
-- Add username and public-URL input.
+- Replace mocked search results with live discovery and Instagram API calls.
+- Replace browser-only saved profiles with project/source persistence.
+- Add project and public-URL workflow.
 - Connect the frontend to discovery, Instagram profile extraction, projects, sources, crawls, reports, and drafts.
 - Build the source/corpus view and crawl-progress state.
 - Build report, evidence, contradiction, uncertainty, timeline, and draft-review views.
 - Add loading, empty, validation, and API-error states.
-- Add styling and the intended visual language.
+- Add frontend API configuration and a typed API client.
 - Add a frontend test runner and component/integration tests.
 
 ## OSINT and Instagram

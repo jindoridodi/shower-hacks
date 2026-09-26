@@ -17,21 +17,38 @@ Username
   → frontend evidence and review experience
 ```
 
+## Current status update
+
+The frontend is now present and runnable as a branded prototype. It includes a landing/search experience, local saved profiles, a mock multi-platform result stream, a profile-to-`love-letters` flow, shared styling/assets, and fixture-driven personalization views.
+
+The frontend is not yet connected to the backend: search results are mocked, saved profiles use browser `localStorage`, and the live Instagram, OSINT, crawl, report, and draft APIs are not wired into the main user flow.
+
+## Current execution focus
+
+Teams 2 and 3 are the active implementation teams. Team 1 is considered feature-complete for the prototype and should provide only integration support, API wiring, and verification while Teams 2 and 3 finish the backend workflow.
+
+Priority order:
+
+1. Team 2: stabilize OSINT, Instagram, approval, and allowlist contracts.
+2. Team 3: complete crawling, document processing, reports, and operational readiness.
+3. Team 1: connect the existing frontend to the finished contracts and verify the end-to-end flow.
+
 ## Team 1 — Frontend and UX
 
 ### Ownership
 
-Own the complete browser experience, frontend runtime, API client, fixture mode, visual design, and frontend tests.
+Own frontend integration and verification. The prototype UI and visual foundation already exist; remaining work is limited to connecting live contracts, filling only necessary workflow gaps, and testing the completed flow.
 
 ### Checklist
 
-- [ ] Add a valid frontend `package.json`, TypeScript configuration, and Next.js setup.
-- [ ] Add development and production build commands.
+- [x] Add a valid frontend `package.json`, TypeScript configuration, and Next.js setup.
+- [x] Add development and production build commands.
 - [ ] Add frontend API base URL configuration and a typed API client.
-- [ ] Add application shell, navigation, loading, error, and empty states.
-- [ ] Add username input with backend-compatible validation.
+- [x] Add application shell, navigation, loading, error, and empty states for the prototype flow.
+- [x] Add username/name/profile-link input UI.
+- [ ] Replace mocked search results with live discovery and Instagram API calls.
 - [ ] Add Instagram lookup through `POST /instagram/profiles`.
-- [ ] Display normalized profile fields, counts, links, posts, verified status, and private status.
+- [ ] Display normalized Instagram profile fields, counts, links, posts, verified status, and private status.
 - [ ] Add Instagram loading, not-found, unavailable, missing-token, and fixture states.
 - [ ] Add OSINT discovery through `POST /api/discovery`.
 - [ ] Display candidates, platform, confidence, match reason, provider evidence, and warnings.
@@ -52,17 +69,27 @@ Own the complete browser experience, frontend runtime, API client, fixture mode,
 
 ### Deliverables
 
-- [ ] Runnable frontend application.
+- [x] Runnable frontend application.
+- [x] Branded landing/search prototype.
+- [x] Local saved-profile prototype.
+- [x] Profile-to-`love-letters` prototype flow.
+- [x] Fixture-driven personalization views.
 - [ ] Typed API client.
-- [ ] Username-to-Instagram UI.
+- [ ] Live username-to-Instagram UI.
 - [ ] OSINT approval UI.
 - [ ] Evidence/report UI.
 - [ ] Frontend tests and setup notes.
+
+### Reduced priority
+
+- [ ] Do not expand the visual design or add new product surfaces until Teams 2 and 3 finish the live contracts.
+- [ ] Do not rebuild the existing landing/search or `love-letters` prototype unless integration reveals a concrete usability issue.
 
 ### Dependencies and handoff
 
 - [ ] Receive frozen API contracts and fixtures from Teams 2 and 3.
 - [ ] Confirm the private-profile display policy.
+- [ ] Replace mock result data and browser-only persistence with the agreed backend contracts.
 - [ ] Demonstrate the full frontend in fixture mode.
 - [ ] Demonstrate live API connectivity using documented environment variables.
 - [ ] Confirm every factual claim has a source link or excerpt.
