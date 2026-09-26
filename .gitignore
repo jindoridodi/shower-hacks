@@ -218,7 +218,9 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Local Borrowed Intimacy database
+# Runtime OSINT dataset cache (deterministic fixtures stay committed)
+data/cache/
+# Local Borrowed Intimacy databases
 data/*.db
 data/*.db-wal
 data/*.db-shm
