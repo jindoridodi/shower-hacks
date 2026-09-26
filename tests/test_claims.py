@@ -1,8 +1,11 @@
+import threading
+
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from apps.api.models import ReportClaim
+from apps.api.services.reports import create_claim
 from tests.helpers import create_project, create_source
 
 
@@ -60,6 +63,39 @@ def test_claim_links_store_excerpts_for_multiple_sources(client):
     fetched = client.get(f"/reports/{report_id}")
     assert fetched.status_code == 200
     assert [item["position"] for item in fetched.json()["claims"]] == [0, 1]
+
+
+def test_concurrent_claims_get_unique_positions(app, client):
+    project = create_project(client)
+    report = client.post("/reports", json={"project_id": project["id"], "title": "Profile"})
+    assert report.status_code == 201
+    report_id = report.json()["id"]
+    barrier = threading.Barrier(6)
+    positions: list[int] = []
+    unexpected: list[BaseException] = []
+    lock = threading.Lock()
+
+    def worker() -> None:
+        session = app.state.session_factory()
+        try:
+            barrier.wait(timeout=5)
+            claim = create_claim(session, report_id, f"Public claim {threading.get_ident()}", [])
+            with lock:
+                positions.append(claim.position)
+        except BaseException as exc:
+            with lock:
+                unexpected.append(exc)
+        finally:
+            session.close()
+
+    threads = [threading.Thread(target=worker) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert unexpected == []
+    assert sorted(positions) == [0, 1, 2, 3, 4, 5]
 
 
 def test_claim_link_requires_a_source_from_the_same_project(client, session):

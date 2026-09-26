@@ -143,3 +143,11 @@ CREATE TABLE IF NOT EXISTS claim_sources (
 
 CREATE INDEX IF NOT EXISTS idx_claim_sources_claim_id ON claim_sources (claim_id);
 CREATE INDEX IF NOT EXISTS idx_claim_sources_source_id ON claim_sources (source_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_report_claims_report_position
+ON report_claims (report_id, position);
+
+-- One queued or running job per source. Completed jobs stay in the table.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crawl_jobs_one_active
+ON crawl_jobs (source_id)
+WHERE status IN ('queued', 'running');

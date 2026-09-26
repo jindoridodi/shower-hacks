@@ -53,23 +53,59 @@ def create_claim(
             )
         seen.add(key)
         resolved.append(_resolve_source(db, report, item))
-    position = db.scalar(
-        select(func.count()).select_from(ReportClaim).where(ReportClaim.report_id == report.id)
-    )
-    now = utc_now()
-    claim = ReportClaim(
-        id=str(uuid4()),
-        report_id=report.id,
+    report_id_value = report.id
+    claim_id = _insert_claim_with_unique_position(
+        db,
+        report_id=report_id_value,
         claim_text=claim_text,
-        position=int(position or 0),
-        created_at=now,
+        resolved=resolved,
     )
-    with transaction(db):
-        db.add(claim)
-        db.flush()
-        for source, excerpt in resolved:
-            _add_link(db, claim, source, excerpt, now)
-    return _load_claim(db, claim.id)
+    return _load_claim(db, claim_id)
+
+
+def _insert_claim_with_unique_position(
+    db: Session,
+    report_id: str,
+    claim_text: str,
+    resolved: list[tuple[Source, str]],
+) -> str:
+    """Insert a claim at the next position, retrying if another writer took it."""
+    for _attempt in range(8):
+        now = utc_now()
+        claim = ReportClaim(
+            id=str(uuid4()),
+            report_id=report_id,
+            claim_text=claim_text,
+            position=0,
+            created_at=now,
+        )
+        try:
+            with transaction(db):
+                position = db.scalar(
+                    select(func.coalesce(func.max(ReportClaim.position), -1) + 1).where(
+                        ReportClaim.report_id == report_id
+                    )
+                )
+                claim.position = int(position or 0)
+                db.add(claim)
+                db.flush()
+                for source, excerpt in resolved:
+                    _add_link(db, claim, source, excerpt, now)
+            return claim.id
+        except APIError as exc:
+            if not _is_claim_position_conflict(exc):
+                raise
+    raise APIError(
+        409,
+        "integrity_error",
+        "Could not assign a unique claim position.",
+    )
+
+
+def _is_claim_position_conflict(exc: APIError) -> bool:
+    if exc.payload["code"] != "integrity_error":
+        return False
+    return "report_claims" in str(exc.__cause__).lower()
 
 
 def add_claim_source(

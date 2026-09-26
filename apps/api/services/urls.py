@@ -27,20 +27,21 @@ def canonicalize_url(url: str) -> str:
     if any(character.isspace() for character in raw):
         raise InvalidURL("URL must not contain whitespace")
 
-    parsed = urlsplit(raw)
-    scheme = parsed.scheme.lower()
-    if scheme not in {"http", "https"}:
-        raise InvalidURL("Only http and https URLs can be stored")
-    if parsed.username is not None or parsed.password is not None:
-        raise InvalidURL("URL must not include username or password")
-
-    host = parsed.hostname
-    if not host:
-        raise InvalidURL("URL must include a host")
     try:
+        parsed = urlsplit(raw)
+        scheme = parsed.scheme.lower()
+        username = parsed.username
+        password = parsed.password
+        host = parsed.hostname
         port = parsed.port
     except ValueError as exc:
-        raise InvalidURL("URL port is invalid") from exc
+        raise InvalidURL("URL is not valid") from exc
+    if scheme not in {"http", "https"}:
+        raise InvalidURL("Only http and https URLs can be stored")
+    if username is not None or password is not None:
+        raise InvalidURL("URL must not include username or password")
+    if not host:
+        raise InvalidURL("URL must include a host")
 
     ascii_host = _ascii_host(host)
     if port is None or _is_default_port(scheme, port):

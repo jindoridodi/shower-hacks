@@ -242,7 +242,7 @@ python scripts/migrate.py
 
 ### Migrations
 
-`python scripts/migrate.py` applies every new file in `db/migrations` and records it in `schema_migrations`. Run it again after it succeeds and it leaves the database unchanged. `db/schema.sql` is the schema snapshot and currently matches `db/migrations/001_initial.sql`.
+`python scripts/migrate.py` applies every new file in `db/migrations` and records it in `schema_migrations`. Run it again after it succeeds and it leaves the database unchanged. `db/schema.sql` is the full schema snapshot: the initial migration plus later files, in order.
 
 Starting the API applies pending migrations too:
 

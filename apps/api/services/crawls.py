@@ -22,19 +22,6 @@ _TRANSITIONS: dict[str, set[str]] = {
 
 def queue_crawl(db: Session, source_id: str) -> CrawlJob:
     source = get_source(db, source_id)
-    active = db.scalar(
-        select(CrawlJob).where(
-            CrawlJob.source_id == source.id,
-            CrawlJob.status.in_(("queued", "running")),
-        )
-    )
-    if active is not None:
-        raise APIError(
-            409,
-            "crawl_already_active",
-            "This source already has a queued or running crawl",
-        )
-
     now = utc_now()
     job = CrawlJob(
         id=str(uuid4()),
@@ -43,12 +30,43 @@ def queue_crawl(db: Session, source_id: str) -> CrawlJob:
         created_at=now,
         updated_at=now,
     )
-    with transaction(db):
-        source.status = "queued"
-        source.updated_at = now
-        db.add(job)
+    try:
+        with transaction(db):
+            locked = db.get(Source, source.id)
+            if locked is None:
+                raise APIError(404, "source_not_found", "Source not found")
+            active = db.scalar(
+                select(CrawlJob.id).where(
+                    CrawlJob.source_id == locked.id,
+                    CrawlJob.status.in_(("queued", "running")),
+                )
+            )
+            if active is not None:
+                raise APIError(
+                    409,
+                    "crawl_already_active",
+                    "This source already has a queued or running crawl",
+                )
+            locked.status = "queued"
+            locked.updated_at = now
+            db.add(job)
+    except APIError as exc:
+        if not _is_active_crawl_conflict(exc):
+            raise
+        raise APIError(
+            409,
+            "crawl_already_active",
+            "This source already has a queued or running crawl",
+        ) from exc
     db.refresh(job)
     return job
+
+
+def _is_active_crawl_conflict(exc: APIError) -> bool:
+    if exc.payload["code"] != "integrity_error":
+        return False
+    # The partial unique index rejects a second queued/running job for one source.
+    return "crawl_jobs" in str(exc.__cause__).lower()
 
 
 def get_crawl(db: Session, crawl_id: str) -> CrawlJob:

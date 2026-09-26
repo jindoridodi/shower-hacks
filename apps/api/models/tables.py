@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -51,6 +51,14 @@ class Source(Base):
 
 class CrawlJob(Base):
     __tablename__ = "crawl_jobs"
+    __table_args__ = (
+        Index(
+            "uq_crawl_jobs_one_active",
+            "source_id",
+            unique=True,
+            sqlite_where=text("status IN ('queued', 'running')"),
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     source_id: Mapped[str] = mapped_column(
@@ -132,6 +140,13 @@ class Report(Base):
 
 class ReportClaim(Base):
     __tablename__ = "report_claims"
+    __table_args__ = (
+        UniqueConstraint(
+            "report_id",
+            "position",
+            name="uq_report_claims_report_position",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True)
     report_id: Mapped[str] = mapped_column(
