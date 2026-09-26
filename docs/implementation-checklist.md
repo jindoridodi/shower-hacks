@@ -1,334 +1,232 @@
-# Borrowed Intimacy Implementation Checklist
+# Three-Team Implementation Checklist
 
-## Definition of done
+## Shared definition of done
 
 The product is complete when a user can enter a username, review public-source candidates, explicitly approve sources, retrieve permitted public information, generate a source-backed report, and inspect every claim and uncertainty in the frontend.
 
-The Instagram path must support:
-
-```text
-Instagram username
-  → profile lookup
-  → public/private status
-  → normalized profile data
-  → frontend review
-```
-
-The broader OSINT path must support:
+Core flow:
 
 ```text
 Username
-  → candidate discovery
-  → confidence and provider evidence
-  → explicit user approval
-  → crawl allowlist
+  → Instagram/profile lookup and OSINT discovery
+  → user reviews candidates
+  → user explicitly approves sources
+  → approved sources enter crawl allowlist
   → public-source retrieval
   → evidence-backed report
+  → frontend evidence and review experience
 ```
 
-## Phase 0 — Confirm scope and contracts
+## Team 1 — Frontend and UX
+
+### Ownership
+
+Own the complete browser experience, frontend runtime, API client, fixture mode, visual design, and frontend tests.
 
 ### Checklist
 
-- [ ] Confirm the primary demo flow: username input, Instagram lookup, OSINT discovery, or all three.
-- [ ] Choose the canonical frontend API base URL.
-- [ ] Choose one API naming convention for projects, sources, crawls, reports, and claims.
-- [ ] Confirm source states and crawl states.
-- [ ] Confirm the policy for private Instagram profiles.
-- [ ] Confirm which fields are safe to display and persist.
-- [ ] Confirm whether Instagram data is only displayed or also included in generated reports.
-- [ ] Choose one prepared demo username and one fallback fixture username.
-- [ ] Document required credentials: Apify, Firecrawl, and LLM provider.
-
-### Exit criteria
-
-- [ ] Frontend and backend owners agree on request and response shapes.
-- [ ] The demo path can be described in one short sequence without ambiguous steps.
-- [ ] No feature depends on an unresolved privacy or authorization decision.
-
-## Phase 1 — Make the frontend runnable
-
-### Checklist
-
-- [ ] Add a valid frontend `package.json`.
-- [ ] Add Next.js, React, TypeScript, and the selected styling dependencies.
-- [ ] Add `tsconfig.json` and required Next.js configuration.
-- [ ] Add a frontend development command.
-- [ ] Add a frontend production build command.
-- [ ] Add the frontend API base URL configuration.
-- [ ] Add a shared API client with typed request and response helpers.
-- [ ] Add a shared application shell and navigation.
-- [ ] Add a global loading state.
-- [ ] Add a global error state.
-- [ ] Add a consistent empty state.
-- [ ] Confirm the frontend starts cleanly against a local API.
-
-### Exit criteria
-
-- [ ] The frontend opens at the expected local URL.
-- [ ] The frontend can call `/health` or `/api/health`.
-- [ ] A production build completes successfully.
-
-## Phase 2 — Username and Instagram experience
-
-### Checklist
-
-- [ ] Add a username input with validation matching the backend.
-- [ ] Add an Instagram lookup action.
-- [ ] Call `POST /instagram/profiles`.
-- [ ] Show loading, not-found, unavailable, and missing-token states.
-- [ ] Display username, full name, biography, profile URL, category, and external URL.
-- [ ] Display follower, following, and post counts when available.
-- [ ] Display verified and private status clearly.
-- [ ] Do not present private-profile data as public evidence.
-- [ ] Display recent caption-bearing posts only when returned.
-- [ ] Link each displayed public profile or post to its source URL.
-- [ ] Add fixture mode for the Instagram path.
-- [ ] Add a clear distinction between retrieved facts and interpretation.
-- [ ] Decide whether profile results are persisted to a project or remain transient.
-
-### Exit criteria
-
-- [ ] A valid username produces a readable Instagram result in the frontend.
-- [ ] An invalid username produces a useful validation message.
-- [ ] Missing `APIFY_API_TOKEN` produces a useful configuration message.
-- [ ] A private or unavailable profile is handled according to the approved policy.
-- [ ] The flow works without live credentials in fixture mode.
-
-## Phase 3 — OSINT discovery and approval
-
-### Checklist
-
-- [ ] Add username discovery input to the frontend.
-- [ ] Call `POST /api/discovery`.
-- [ ] Display candidate URL, platform, confidence, match reason, and provider evidence.
-- [ ] Display partial-provider warnings without hiding successful results.
-- [ ] Distinguish discovery suggestions from verified identity.
-- [ ] Add candidate selection controls.
-- [ ] Add an explicit approval action.
-- [ ] Save approved URLs to the selected project.
-- [ ] Display already-saved sources.
-- [ ] Add remove/reject controls for saved candidates.
-- [ ] Prevent automatic crawling during discovery.
-- [ ] Ensure only approved URLs enter the crawl allowlist.
-- [ ] Handle duplicate candidates deterministically.
-- [ ] Handle zero candidates cleanly.
-- [ ] Handle provider timeout and unavailable states cleanly.
-- [ ] Keep fixture mode available for all providers.
-
-### Exit criteria
-
-- [ ] A username returns ranked candidates in the frontend.
-- [ ] The user must explicitly approve a candidate before crawling.
-- [ ] A rejected candidate is not queued for crawling.
-- [ ] Candidate provider evidence is visible to the user.
-
-## Phase 4 — Projects, sources, and crawl workflow
-
-### Checklist
-
+- [ ] Add a valid frontend `package.json`, TypeScript configuration, and Next.js setup.
+- [ ] Add development and production build commands.
+- [ ] Add frontend API base URL configuration and a typed API client.
+- [ ] Add application shell, navigation, loading, error, and empty states.
+- [ ] Add username input with backend-compatible validation.
+- [ ] Add Instagram lookup through `POST /instagram/profiles`.
+- [ ] Display normalized profile fields, counts, links, posts, verified status, and private status.
+- [ ] Add Instagram loading, not-found, unavailable, missing-token, and fixture states.
+- [ ] Add OSINT discovery through `POST /api/discovery`.
+- [ ] Display candidates, platform, confidence, match reason, provider evidence, and warnings.
+- [ ] Explain that discovery suggestions are not identity proof.
+- [ ] Add candidate selection, explicit approval, saved-source display, and reject/remove controls.
+- [ ] Prevent automatic crawling from the discovery screen.
 - [ ] Add project creation and project selection.
-- [ ] Add public URL input as a separate direct-input path.
-- [ ] Validate public URLs before saving.
-- [ ] Reject credentials, loopback, private, and invalid URL targets.
-- [ ] Create source records through the API.
-- [ ] Display source status and canonical URL.
-- [ ] Add a crawl-scope review before starting.
-- [ ] Add an explicit queue/start crawl action.
-- [ ] Display queued, running, succeeded, partial, and failed states consistently.
-- [ ] Add crawl error details without exposing sensitive internals.
-- [ ] Add a worker/background execution path for queued crawls.
-- [ ] Connect the worker to the Firecrawl scraper.
-- [ ] Enforce allowlist, terms, robots, public-target, and rate-limit checks.
-- [ ] Persist crawl timestamps, errors, and content hashes.
-- [ ] Add retry behavior for safe transient failures.
-- [ ] Prevent duplicate active crawls for the same source.
-
-### Exit criteria
-
-- [ ] An approved source can be queued from the frontend.
-- [ ] A queued crawl reaches a terminal state.
-- [ ] A successful crawl creates a document.
-- [ ] A failed crawl is visible and recoverable.
-- [ ] No unapproved URL is fetched.
-
-## Phase 5 — Documents, evidence, and report generation
-
-### Checklist
-
-- [ ] Display the source ledger for a project.
-- [ ] Display document title, URL, capture time, and processing status.
-- [ ] Display searchable or selectable document excerpts.
-- [ ] Preserve source IDs through chunks, retrieval, claims, and UI components.
-- [ ] Add sensitivity filtering before generation.
-- [ ] Ensure sensitive data is not passed into generation.
-- [ ] Generate a factual profile with citations.
-- [ ] Generate a relationship summary with citations.
-- [ ] Generate an uncertainty report.
-- [ ] Detect and display contradictions.
-- [ ] Display unknowns when the corpus lacks support.
-- [ ] Reject unsupported claims.
-- [ ] Label observed facts, inferences, uncertainty, and conflicts.
-- [ ] Make every claim link to one or more source excerpts.
-- [ ] Add report loading, empty, failed, and unavailable-model states.
-- [ ] Connect the existing report-generation API to the frontend.
-
-### Exit criteria
-
-- [ ] A report cannot contain an unsupported factual claim.
-- [ ] Every displayed claim has a usable source link or excerpt.
-- [ ] Empty evidence produces no fabricated claims.
-- [ ] Conflicting evidence is shown rather than silently resolved.
-
-## Phase 6 — Evidence reveal and communication draft review
-
-### Checklist
-
-- [ ] Add a claim detail/evidence drawer.
-- [ ] Add source excerpt highlighting or clear excerpt presentation.
-- [ ] Add confidence display with the documented meanings.
-- [ ] Add the public timeline view.
-- [ ] Separate precise and imprecise dates.
-- [ ] Add communication-draft generation through the backend.
-- [ ] Display recipient, subject, and body as editable fields.
-- [ ] Display the exact AI-generated label.
-- [ ] Display the manual-review requirement.
-- [ ] Keep citations attached to draft claims where applicable.
+- [ ] Add direct public-URL input and crawl-scope review.
+- [ ] Display source metadata and queued, running, succeeded, partial, and failed crawl states.
+- [ ] Add source ledger and document views.
+- [ ] Add report view with claims, confidence, claim types, citations, and evidence drawer.
+- [ ] Add contradiction, uncertainty, unknowns, and timeline views.
+- [ ] Add communication-draft review with AI-generated and manual-review labels.
 - [ ] Do not add send, post, email, calendar, or automatic export actions.
-- [ ] Ensure drafts never imitate the subject's voice or conceal AI authorship.
-
-### Exit criteria
-
-- [ ] A user can move from a claim to its evidence in one interaction.
-- [ ] A user can review and edit a draft without any automatic external action.
-- [ ] The UI clearly separates evidence from generated language.
-
-## Phase 7 — OSINT extensions and optional enrichment
-
-### Checklist
-
-- [ ] Verify Sherlock behavior with a live known-good query.
-- [ ] Verify Maigret behavior with a live known-good query.
-- [ ] Verify WhatsMyName dataset loading and stale-cache fallback.
-- [ ] Confirm provider failures remain non-fatal.
-- [ ] Add complete subprocess timeout and malformed-output coverage.
-- [ ] Verify Gephi CSV ZIP output manually.
-- [ ] Verify GEXF output opens in Gephi.
-- [ ] Keep SpiderFoot disabled unless explicitly configured.
-- [ ] Enforce the SpiderFoot module allowlist.
-- [ ] Enforce local-sidecar restrictions.
-- [ ] Cap enrichment result counts.
-- [ ] Require explicit user selection before any enrichment result can become a crawl source.
-- [ ] Document that OSINT discovery is not identity proof.
-
-### Exit criteria
-
-- [ ] Every live provider can be replaced by deterministic fixtures.
-- [ ] One failed provider does not block the remaining providers.
-- [ ] Enrichment cannot silently trigger crawling or profile contact.
-
-## Phase 8 — Testing and safety verification
-
-### Backend tests
-
-- [ ] Run all Python tests in a configured virtual environment.
-- [ ] Test username validation.
-- [ ] Test URL validation and canonicalization.
-- [ ] Test provider deduplication and confidence scoring.
-- [ ] Test provider timeout and unavailable behavior.
-- [ ] Test private/local target rejection.
-- [ ] Test explicit candidate approval and allowlisting.
-- [ ] Test crawl state transitions.
-- [ ] Test crawl failure persistence.
-- [ ] Test document hash and deduplication behavior.
-- [ ] Test sensitivity filtering.
-- [ ] Test claim-source integrity.
-- [ ] Test report generation with empty evidence.
-- [ ] Test Instagram success, not-found, private, invalid, and unconfigured cases.
-
-### Frontend tests
-
 - [ ] Add component test tooling.
-- [ ] Test username validation.
-- [ ] Test Instagram loading, success, and error states.
-- [ ] Test candidate selection and approval.
-- [ ] Test source and crawl status rendering.
-- [ ] Test evidence drawer behavior.
-- [ ] Test contradiction and unknown displays.
-- [ ] Test draft review labels and disabled external actions.
-- [ ] Test fixture mode.
+- [ ] Test validation, Instagram states, candidate approval, crawl statuses, evidence, reports, drafts, and fixture mode.
+- [ ] Confirm the production build succeeds.
 
-### Manual safety checks
+### Deliverables
 
-- [ ] Verify no credentials or cookies are accepted for scraping.
-- [ ] Verify no private-account content is presented as public evidence.
-- [ ] Verify no candidate is crawled automatically.
-- [ ] Verify no generated message is sent automatically.
-- [ ] Verify sensitive fields are filtered before generation.
-- [ ] Verify source URLs and excerpts remain attributable.
+- [ ] Runnable frontend application.
+- [ ] Typed API client.
+- [ ] Username-to-Instagram UI.
+- [ ] OSINT approval UI.
+- [ ] Evidence/report UI.
+- [ ] Frontend tests and setup notes.
 
-## Phase 9 — Operations and release
+### Dependencies and handoff
+
+- [ ] Receive frozen API contracts and fixtures from Teams 2 and 3.
+- [ ] Confirm the private-profile display policy.
+- [ ] Demonstrate the full frontend in fixture mode.
+- [ ] Demonstrate live API connectivity using documented environment variables.
+- [ ] Confirm every factual claim has a source link or excerpt.
+
+## Team 2 — OSINT and Instagram
+
+### Ownership
+
+Own public username discovery, Instagram profile extraction, provider behavior, candidate confidence, source approval data, enrichment boundaries, and OSINT safety.
 
 ### Checklist
 
-- [ ] Complete local setup instructions.
-- [ ] Add frontend environment configuration documentation.
-- [ ] Add API URL and CORS configuration documentation.
-- [ ] Document Apify, Firecrawl, and LLM setup.
-- [ ] Document fixture-only startup.
-- [ ] Add database initialization and reset instructions.
-- [ ] Add worker startup instructions.
-- [ ] Add SpiderFoot optional-service instructions.
-- [ ] Add production secrets configuration.
-- [ ] Add health checks for frontend, API, database, and worker.
-- [ ] Confirm clean restart from an empty local database.
-- [ ] Confirm the demo works without live credentials in fixture mode.
-- [ ] Run the complete demo three times.
-- [ ] Verify logs do not expose sensitive source content or credentials.
+- [ ] Verify Sherlock username discovery.
+- [ ] Verify Maigret username discovery.
+- [ ] Verify WhatsMyName dataset loading and stale-cache fallback.
+- [ ] Preserve explicit public-URL discovery.
+- [ ] Normalize and canonicalize candidate URLs.
+- [ ] Deduplicate candidates across providers.
+- [ ] Calculate confidence from provider evidence.
+- [ ] Preserve provider evidence in responses.
+- [ ] Return partial results when a provider fails.
+- [ ] Return valid empty results for no matches.
+- [ ] Add provider timeout and malformed-output handling.
+- [ ] Verify subprocesses use argument arrays and never shell execution.
+- [ ] Keep fixture mode available for every provider.
+- [ ] Verify the `POST /instagram/profiles` contract and Apify actor configuration.
+- [ ] Normalize Instagram profile fields and recent caption-bearing posts.
+- [ ] Handle Instagram not-found, private, unavailable, and missing-token cases.
+- [ ] Decide whether private-profile data is displayed, stored, or discarded.
+- [ ] Do not download or analyze images unless separately approved.
+- [ ] Add deterministic Instagram fixtures and tests.
+- [ ] Define the approved-candidate request and response shape.
+- [ ] Save approved URLs to a project and track approval separately from confidence.
+- [ ] Ensure rejected candidates cannot be crawled.
+- [ ] Ensure only approved URLs enter the crawl allowlist.
+- [ ] Prevent discovery or enrichment from automatically crawling candidates.
+- [ ] Verify Gephi CSV ZIP and GEXF exports.
+- [ ] Keep SpiderFoot disabled unless explicitly configured.
+- [ ] Enforce SpiderFoot module, local-sidecar, and result-count restrictions.
+- [ ] Require explicit selection before enrichment results become sources.
+- [ ] Document that OSINT discovery is not identity proof.
+- [ ] Run one known-good live username query per provider.
+- [ ] Test duplicate results, provider failure, target rejection, timeouts, and fixture/live shape equivalence.
+
+### Deliverables
+
+- [ ] Stable discovery API contract.
+- [ ] Stable Instagram profile API contract.
+- [ ] Candidate approval and allowlist contract.
+- [ ] Provider fixtures and tests.
+- [ ] Live-provider verification notes.
+- [ ] OSINT safety and privacy notes.
+
+### Dependencies and handoff
+
+- [ ] Receive project/source model requirements from Team 3.
+- [ ] Provide discovery and Instagram fixtures to Team 1.
+- [ ] Provide approval and allowlist fields to Team 3.
+- [ ] Demonstrate that approval is explicit and cannot be bypassed.
+- [ ] Demonstrate that public/private status is present and unambiguous.
+
+## Team 3 — Platform, Crawling, Reports, and Operations
+
+### Ownership
+
+Own the database, projects, sources, crawl execution, Firecrawl integration, documents, filtering, report generation, API integration, workers, setup, and deployment.
+
+### Checklist
+
+- [ ] Choose the canonical API route naming convention.
+- [ ] Resolve documented versus implemented project/source route differences.
+- [ ] Confirm project, source, crawl, document, report, claim, and draft schemas.
+- [ ] Confirm crawl statuses, errors, candidate approval, and allowlist fields.
+- [ ] Document contracts for Teams 1 and 2.
+- [ ] Support project and source creation/retrieval.
+- [ ] Validate public URLs and reject credentials, local, private, and invalid targets.
+- [ ] Store canonical URLs, approval state, crawl state, timestamps, and content hashes.
+- [ ] Prevent duplicate active crawls.
+- [ ] Add a worker/background path for queued crawls.
+- [ ] Connect the worker to Firecrawl.
+- [ ] Enforce allowlist, terms, robots, public-target, and rate-limit checks.
+- [ ] Persist crawl start, completion, and failure information.
+- [ ] Implement safe transient retries and redirect handling.
+- [ ] Create documents from successful crawls.
+- [ ] Store raw/cleaned text, chunks, source IDs, and FTS5 records.
+- [ ] Deduplicate documents by content hash.
+- [ ] Run sensitivity filtering before generation.
+- [ ] Prevent sensitive data from entering generation prompts.
+- [ ] Return attributable excerpts and empty results instead of invented support.
+- [ ] Connect real documents to factual profiles, relationship summaries, and uncertainty reports.
+- [ ] Detect and persist contradictions and unknowns.
+- [ ] Reject unsupported claims and preserve claim-source relationships.
+- [ ] Generate review-only communication drafts with AI labels.
+- [ ] Prevent automatic sending or posting.
+- [ ] Run the complete Python test suite in a configured environment.
+- [ ] Test database, crawl, Firecrawl, documents, filtering, claims, reports, and dependency failures.
+- [ ] Complete local setup, deployment, environment, worker, database, and fixture-only documentation.
+- [ ] Add health checks for API, database, worker, and required dependencies.
+- [ ] Confirm clean restart from an empty database.
+- [ ] Confirm logs do not expose credentials or sensitive source content.
 - [ ] Add the project license before public release.
+- [ ] Rehearse the full demo three times.
 
-### Exit criteria
+### Deliverables
 
-- [ ] A new developer can start the system from the documentation.
-- [ ] The demo can complete in under two minutes with fixtures.
-- [ ] The live path fails clearly when credentials or services are unavailable.
-- [ ] The release scope and known limitations are documented.
+- [ ] Stable backend contracts.
+- [ ] Working project/source/crawl APIs.
+- [ ] Working crawl worker.
+- [ ] Working document and evidence pipeline.
+- [ ] Working report and draft generation.
+- [ ] Backend and integration tests.
+- [ ] Local setup, deployment, and demo documentation.
 
-## Recommended execution order
+### Dependencies and handoff
 
-### Milestone 1 — Runnable shell
+- [ ] Receive the approved-candidate contract from Team 2.
+- [ ] Receive frontend API requirements from Team 1.
+- [ ] Provide project, source, crawl, report, and draft fixtures to Team 1.
+- [ ] Demonstrate that approved sources reach terminal crawl states.
+- [ ] Demonstrate that successful crawls create attributable documents.
+- [ ] Demonstrate that documents produce cited reports.
+- [ ] Demonstrate readable failure behavior when dependencies are unavailable.
 
-Complete Phases 0–1. The frontend starts, builds, and can reach the API.
+## Shared integration milestones
+
+### Milestone 1 — Contract freeze
+
+- [ ] Teams agree on schemas, statuses, errors, fixtures, and environment variables.
+- [ ] Team 2 provides discovery and Instagram fixtures.
+- [ ] Team 3 provides project, source, crawl, report, and draft fixtures.
+- [ ] Team 1 renders all fixture shapes.
 
 ### Milestone 2 — Instagram vertical slice
 
-Complete Phase 2. A user can enter an Instagram username and inspect normalized profile information, including private/unavailable states.
+- [ ] User enters a username.
+- [ ] Frontend calls the Instagram endpoint.
+- [ ] Backend returns normalized profile data or a readable error.
+- [ ] Frontend displays profile evidence and public/private status.
 
 ### Milestone 3 — OSINT approval slice
 
-Complete Phase 3. A user can discover candidates, understand confidence/provider evidence, and explicitly approve sources.
+- [ ] User enters a username.
+- [ ] Providers return candidates.
+- [ ] Frontend displays confidence and provider evidence.
+- [ ] User explicitly approves a candidate.
+- [ ] Approved candidate is saved and allowlisted.
 
 ### Milestone 4 — Crawl slice
 
-Complete Phase 4. Approved sources can be crawled and produce stored documents with visible status.
+- [ ] Approved source is queued.
+- [ ] Worker executes the crawl.
+- [ ] Frontend displays progress and terminal state.
+- [ ] Successful crawl creates an attributable document.
 
 ### Milestone 5 — Evidence-backed report
 
-Complete Phase 5. Stored documents become cited claims, contradictions, and unknowns in the frontend.
+- [ ] Documents are filtered and searchable.
+- [ ] Report generation returns cited claims.
+- [ ] Frontend displays claims, excerpts, contradictions, and unknowns.
 
-### Milestone 6 — Finished experience
+### Milestone 6 — Release readiness
 
-Complete Phase 6. Evidence reveal, timeline, and review-only communication drafts are usable.
-
-### Milestone 7 — Harden and release
-
-Complete Phases 7–9. Live providers, tests, safety constraints, operations, and demo rehearsal are complete.
-
-## Highest-priority blockers
-
-1. Frontend runtime and application shell are not established.
-2. Frontend-to-API integration is not implemented.
-3. Candidate approval is not yet connected to a crawl allowlist.
-4. Queued crawl execution is not wired to a worker.
-5. Live personalization/report data is not connected; the current UI is fixture-driven.
-6. The full test suite cannot currently be verified until the Python test environment is available.
+- [ ] End-to-end tests pass.
+- [ ] Fixture-only demo works from a clean restart.
+- [ ] Live dependency failures are readable.
+- [ ] Safety checks pass.
+- [ ] Setup and deployment documentation is complete.
