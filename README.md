@@ -226,6 +226,151 @@ The prototype should crawl only publicly accessible pages, avoid authentication 
 
 Communication drafts must not claim to be written by the target, use the target's private identity, or be sent automatically. The interface should visibly label them as AI-generated and preserve their source citations.
 
+## Backend slice
+
+The FastAPI service in `apps/api` covers projects, manually supplied public URLs, crawl jobs, documents, searchable chunks, and claim-to-source evidence. Pages are stored when a caller supplies text or a `ScrapedPage`. The Firecrawl client itself is a plug-in point in `apps/api/services/firecrawl.py`.
+
+### Setup
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+cp .env.example .env
+python scripts/migrate.py
+```
+
+### Migrations
+
+`python scripts/migrate.py` applies every new file in `db/migrations` and records it in `schema_migrations`. Run it again after it succeeds and it leaves the database unchanged. `db/schema.sql` is the schema snapshot and currently matches `db/migrations/001_initial.sql`.
+
+Starting the API applies pending migrations too:
+
+```bash
+uvicorn apps.api.main:app --reload
+```
+
+SQLite foreign keys are enabled on each connection. FTS5 indexes `document_chunks`.
+
+### Seed and reset
+
+```bash
+python scripts/seed.py
+python scripts/reset_db.py
+```
+
+`scripts/seed.py` creates a project named `Demo` and the public source `https://example.com/` when they are absent. Running it twice keeps a single project and source.
+
+`scripts/reset_db.py` deletes only `data/borrowed_intimacy.db` inside this repository, plus the SQLite `-wal` and `-shm` files beside it, then recreates the empty schema. Any other `DATABASE_URL` is refused.
+
+### Tests
+
+```bash
+pytest
+```
+
+### API
+
+Error responses look like:
+
+```json
+{"detail": {"code": "duplicate_canonical_url", "message": "A source with canonical URL https://example.com/ already exists in this project"}}
+```
+
+Request validation uses the code `validation_error`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/health` | Database connectivity check |
+| `POST` | `/projects` | Create a project |
+| `GET` | `/projects/{project_id}` | Fetch a project |
+| `POST` | `/sources` | Add a public URL to a project |
+| `GET` | `/sources?project_id=` | List sources for a project |
+| `GET` | `/sources/{source_id}` | Fetch a source |
+| `POST` | `/sources/{source_id}/queue` | Queue a crawl for a source |
+| `POST` | `/crawls` | Create a crawl job (`{"source_id": "..."}`) |
+| `GET` | `/crawls?source_id=` | List crawl jobs for a source |
+| `GET` | `/crawls/{crawl_id}` | Fetch a crawl job |
+| `PATCH` | `/crawls/{crawl_id}` | Move a job through `running`, `succeeded`, or `failed` |
+| `POST` | `/documents` | Store document text; the same content hash for one source returns the existing row |
+| `GET` | `/documents/{document_id}` | Fetch a document |
+| `POST` | `/documents/{document_id}/chunks` | Insert chunks (`{"chunks": [{"chunk_index": 0, "text": "..."}]}`) |
+| `GET` | `/documents/{document_id}/chunks` | List chunks |
+| `GET` | `/search/chunks?q=` | Full-text search over chunk text |
+| `POST` | `/reports` | Create a report shell for evidence |
+| `GET` | `/reports/{report_id}` | Fetch a report with claims and excerpts |
+| `POST` | `/reports/{report_id}/claims` | Add a claim and optional source excerpts |
+| `POST` | `/report-claims/{claim_id}/sources` | Link another source excerpt to a claim |
+
+Source creation body:
+
+```json
+{"project_id": "PROJECT_ID", "url": "https://example.com/about"}
+```
+
+Canonical URLs are unique inside a project. `https://Example.com/about/` and `https://example.com/about` are the same source. The stored `url` keeps the submitted string; `canonical_url` is the normalized form.
+
+Crawl status values are `queued`, `running`, `succeeded`, and `failed`. A failed update requires `error_message`. `sources.status` follows the latest job. A new source starts as `pending`. `scraped_at` is set when a job succeeds.
+
+Document body:
+
+```json
+{
+  "source_id": "SOURCE_ID",
+  "title": "About",
+  "cleaned_text": "Public biography text",
+  "raw_text": "<p>Public biography text</p>",
+  "sensitivity_status": "unreviewed"
+}
+```
+
+`content_hash` is the SHA-256 hex digest of `cleaned_text` when that field is present, otherwise of `raw_text`. Sending a hash that does not match the text returns `content_hash_mismatch`. Posting the same hash again for the same source returns HTTP 200 with `deduplicated: true`.
+
+Claim body:
+
+```json
+{
+  "claim_text": "The page describes a public biography.",
+  "sources": [
+    {"source_id": "SOURCE_ID", "excerpt": "Public biography text"}
+  ]
+}
+```
+
+Every claim-source row stores an excerpt. The source must belong to the report's project.
+
+### Database
+
+| Table | Role |
+| --- | --- |
+| `projects` | A portrait workspace |
+| `sources` | Public URL, canonical URL, status, content hash, `scraped_at` |
+| `crawl_jobs` | One crawl attempt: status, error message, start and completion times |
+| `documents` | Raw text, cleaned text, content hash, `sensitivity_status` |
+| `document_chunks` | Ordered chunk text for a document |
+| `document_chunks_fts` | FTS5 index kept in sync by triggers |
+| `reports` | A report shell for later generation |
+| `report_claims` | `claim_text` attached to a report |
+| `claim_sources` | `source_id` plus `excerpt` for a claim |
+
+`sensitivity_status` is one of `unreviewed`, `clear`, `sensitive`, or `redacted`. New documents from the scraper seam are stored as `unreviewed`.
+
+`claim_sources.source_id` uses `ON DELETE RESTRICT`, so a cited source stays in place while a claim quotes it.
+
+### Firecrawl follow-up
+
+`get_public_page_scraper()` returns a stub. Implementing the client means:
+
+1. Satisfy `PublicPageScraper.scrape_public_url(url) -> ScrapedPage` for a publicly accessible page.
+2. Have a worker load a `queued` crawl, call the scraper with `sources.canonical_url`, then call `ingest_scraped_page`.
+3. On a scraper exception, `PATCH /crawls/{id}` with `{"status": "failed", "error_message": "..."}`.
+4. Keep the client limited to a URL. The protocol has no cookie, session, or credential argument.
+5. Honor robots directives, rate limits, and site terms in that client.
+6. Handle redirects explicitly. `ingest_scraped_page` accepts a page only when its URL canonicalizes to the source URL.
+7. Chunking and sensitivity classification stay outside ingest. The stored document remains `unreviewed` until a later filter updates `sensitivity_status`.
+
+`docs/04-integration-contract.md` and `docs/06-team-integration-playbook.md` describe a thinner HTTP surface under `/api/...`, crawl statuses such as `complete` and `partial`, and a `claims` table. This slice follows the source-ledger brief: `/sources` and `/crawls`, statuses `queued`, `running`, `succeeded`, and `failed`, and `report_claims`. Agree on one contract before the frontend binds to field names.
+
 ## License
 
 Add the project’s license before public release.
