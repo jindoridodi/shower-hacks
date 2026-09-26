@@ -34,7 +34,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     database_path = tmp_path / "app.db"
     first = apply_migrations(database_path)
     second = apply_migrations(database_path)
-    assert first == ["001_initial", "002_raw_document_contract", "002_uniqueness"]
+    assert first == ["001_initial", "002_raw_document_contract", "002_uniqueness", "003_document_processing"]
     assert second == []
 
     connection = sqlite3.connect(database_path)
@@ -56,7 +56,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     finally:
         connection.close()
     assert REQUIRED_TABLES <= names
-    assert versions == ["001_initial", "002_raw_document_contract", "002_uniqueness"]
+    assert versions == ["001_initial", "002_raw_document_contract", "002_uniqueness", "003_document_processing"]
     assert "uq_report_claims_report_position" in indexes
     assert "uq_crawl_jobs_one_active" in indexes
 
@@ -133,3 +133,25 @@ def test_foreign_keys_reject_orphan_rows(app):
                 )
     finally:
         connection.close()
+
+
+def test_processing_migration_preserves_existing_documents(tmp_path):
+    database_path = tmp_path / 'upgrade.db'
+    root = repo_root()
+    with sqlite3.connect(database_path) as connection:
+        connection.execute('CREATE TABLE schema_migrations (version TEXT PRIMARY KEY, applied_at TEXT NOT NULL)')
+        for version in ('001_initial', '002_raw_document_contract', '002_uniqueness'):
+            connection.executescript((root / 'db/migrations' / f'{version}.sql').read_text())
+            connection.execute('INSERT INTO schema_migrations VALUES (?, ?)', (version, 'now'))
+        connection.execute("INSERT INTO projects VALUES ('p', 'Project', NULL, 'now', 'now')")
+        connection.execute("""INSERT INTO sources
+            (id, project_id, url, canonical_url, status, created_at, updated_at)
+            VALUES ('s', 'p', 'https://example.com', 'https://example.com', 'pending', 'now', 'now')""")
+        connection.execute("""INSERT INTO documents
+            (id, source_id, content_hash, cleaned_text, sensitivity_status, created_at, updated_at)
+            VALUES ('d', 's', ?, 'Existing text', 'unreviewed', 'now', 'now')""", ('a' * 64,))
+    assert apply_migrations(database_path) == ['003_document_processing']
+    assert apply_migrations(database_path) == []
+    with sqlite3.connect(database_path) as connection:
+        row = connection.execute('SELECT cleaned_text, sensitivity_status, processing_metadata, sensitivity_findings, metadata_findings FROM documents').fetchone()
+    assert row == ('Existing text', 'unreviewed', '{}', '[]', '[]')

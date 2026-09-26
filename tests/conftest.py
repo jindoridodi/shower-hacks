@@ -29,3 +29,8 @@ def session(app):
         yield db
     finally:
         db.close()
+
+
+@pytest.fixture(autouse=True)
+def isolated_raw_document_storage(tmp_path, monkeypatch):
+    monkeypatch.setattr("apps.api.services.crawls.repo_root", lambda: tmp_path)

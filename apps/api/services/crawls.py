@@ -11,7 +11,9 @@ from apps.api.config import repo_root
 from apps.api.db import transaction
 from apps.api.errors import APIError
 from apps.api.models import CrawlJob, Document, Source
-from apps.api.services.documents import stage_document
+from apps.api.services.documents import stage_chunks, stage_document
+from apps.api.services.chunker import chunk_text
+from apps.api.services.processing import prepare_document
 from apps.api.services.firecrawl import PublicPageScraper, ScrapedPage, get_public_page_scraper
 from apps.api.services.sources import get_source
 from apps.api.services.hashing import sha256_text
@@ -137,11 +139,12 @@ def update_crawl_status(
     return job
 
 
-def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Document:
+def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Document | None:
     """Store a scraper result and mark the crawl succeeded.
 
     Workers should call this after PublicPageScraper.scrape_public_url. The HTTP
     API does not call it, so a missing Firecrawl client cannot fetch pages.
+    A fully filtered page fails the crawl and returns None without storing a body.
     """
     job = get_crawl(db, crawl_id)
     if job.status in {"succeeded", "failed"}:
@@ -161,11 +164,15 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
             "url_mismatch",
             "Scraped URL does not match the source canonical URL",
         )
-    markdown = page.markdown.strip()
-    if not markdown:
-        raise APIError(422, "empty_document", "Scraped page has no markdown text")
+    prepared = prepare_document(
+        page.markdown, metadata={"url": page.url, "title": page.title}
+    )
+    if prepared["raw_text"] is None:
+        update_crawl_status(
+            db, crawl_id, "failed", "No usable content remains after document processing"
+        )
+        return None
 
-    raw_path = _store_raw_markdown(source.id, markdown)
     now = utc_now()
     with transaction(db):
         if job.started_at is None:
@@ -174,17 +181,30 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
         job.updated_at = now
         source.status = "running"
         source.updated_at = now
-        document, _created = stage_document(
+        document, created = stage_document(
             db,
             source_id=source.id,
-            title=page.title,
+            title=prepared["metadata"].get("title"),
             content_type="text/markdown",
-            raw_path=raw_path,
-            raw_text=page.raw_html,
-            cleaned_text=markdown,
-            sensitivity_status="unreviewed",
+            # Raw HTML is never part of the filtered Markdown storage contract.
+            raw_text=prepared["raw_text"],
+            cleaned_text=prepared["cleaned_text"],
+            sensitivity_status=prepared["sensitivity_status"],
             content_hash=None,
+            processing_metadata=prepared["metadata"],
+            sensitivity_findings=prepared["findings"],
+            metadata_findings=prepared["metadata_findings"],
         )
+        if created:
+            chunks = chunk_text(
+                prepared["cleaned_text"],
+                document_id=document.id,
+                source_id=document.source_id,
+                sensitivity_status=prepared["sensitivity_status"],
+            )
+            stage_chunks(db, document, [(c["chunk_index"], c["text"]) for c in chunks])
+            db.flush()
+            document.raw_path = _store_raw_markdown(source.id, prepared["raw_text"])
         finished = utc_now()
         job.status = "succeeded"
         job.error_message = None
@@ -201,7 +221,7 @@ def run_queued_crawl(
     db: Session,
     crawl_id: str,
     scraper: PublicPageScraper | None = None,
-) -> Document:
+) -> Document | None:
     """Worker entry point: scrape the queued source and persist its schema-backed result."""
 
     job = get_crawl(db, crawl_id)
@@ -212,13 +232,13 @@ def run_queued_crawl(
     try:
         page = (scraper or get_public_page_scraper()).scrape_public_url(source.url)
         return ingest_scraped_page(db, crawl_id, page)
-    except Exception as error:
-        update_crawl_status(db, crawl_id, "failed", str(error))
+    except Exception:
+        update_crawl_status(db, crawl_id, "failed", "Crawl processing failed")
         raise
 
 
 def _store_raw_markdown(source_id: str, markdown: str) -> str:
-    """Persist raw extraction outside SQLite and return a repo-relative path."""
+    """Persist filtered Markdown outside SQLite and return a repo-relative path."""
 
     digest = sha256_text(markdown)
     relative = Path("data") / "raw" / source_id / f"{digest}.md"

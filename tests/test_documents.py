@@ -186,3 +186,27 @@ def test_chunk_full_text_search(client):
     empty = client.get("/search/chunks", params={"q": "***"})
     assert empty.status_code == 422
     assert empty.json()["detail"]["code"] == "invalid_search"
+
+
+def test_chunk_api_preserves_whitespace_and_rejects_blank_text(client):
+    project = create_project(client)
+    source = create_source(client, project['id'])
+    parts = ['  Hiking\n\n', 'robots.  ', '\nProjects\n']
+    created = client.post('/documents', json={
+        'source_id': source['id'], 'cleaned_text': ''.join(parts),
+        'chunks': [{'chunk_index': i, 'text': part} for i, part in enumerate(parts)],
+    })
+    assert created.status_code == 201
+    document_id = created.json()['id']
+    chunks = client.get(f'/documents/{document_id}/chunks').json()
+    assert [c['text'] for c in chunks] == parts
+    extra = client.post(f'/documents/{document_id}/chunks', json={
+        'chunks': [{'chunk_index': 3, 'text': '  More\n'}],
+    })
+    assert extra.status_code == 201
+    assert extra.json()[0]['text'] == '  More\n'
+    for blank in ('', ' ', '\n\t'):
+        rejected = client.post(f'/documents/{document_id}/chunks', json={
+            'chunks': [{'chunk_index': 4, 'text': blank}],
+        })
+        assert rejected.status_code == 422
