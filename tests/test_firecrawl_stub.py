@@ -4,7 +4,9 @@ from apps.api.config import Settings
 from apps.api.errors import APIError
 from apps.api.services.crawls import ingest_scraped_page
 from apps.api.services.firecrawl import (
+    FirecrawlPolicyError,
     FirecrawlNotConfiguredError,
+    FirecrawlPublicPageScraper,
     ScrapedPage,
     get_public_page_scraper,
 )
@@ -12,7 +14,9 @@ from tests.helpers import create_project, create_source
 
 
 def test_scraper_stub_does_not_fetch():
-    plain = get_public_page_scraper(Settings(database_url="sqlite:///./data/borrowed_intimacy.db"))
+    plain = get_public_page_scraper(
+        Settings(database_url="sqlite:///./data/borrowed_intimacy.db", firecrawl_api_key="")
+    )
     with pytest.raises(FirecrawlNotConfiguredError):
         plain.scrape_public_url("https://example.com/")
 
@@ -22,8 +26,40 @@ def test_scraper_stub_does_not_fetch():
             firecrawl_api_key="test-key",
         )
     )
-    with pytest.raises(FirecrawlNotConfiguredError, match="not implemented"):
+    with pytest.raises(FirecrawlPolicyError, match="CRAWL_ALLOWED_URLS"):
         configured.scrape_public_url("https://example.com/")
+
+
+def test_firecrawl_scraper_returns_the_shared_scraped_page_contract():
+    seen = {}
+
+    def transport(payload):
+        seen.update(payload)
+        return {
+            "success": True,
+            "data": {
+                "markdown": "# Public profile",
+                "metadata": {"title": "Profile", "sourceURL": "https://example.com/about"},
+            },
+        }
+
+    scraper = FirecrawlPublicPageScraper(
+        Settings(
+            firecrawl_api_key="test-key",
+            crawl_allowed_urls="https://example.com/about",
+            crawl_terms_accepted_hosts="example.com",
+        ),
+        transport=transport,
+        robots_fetcher=lambda _: "User-agent: *\nAllow: /\n",
+        host_resolver=lambda _: ["93.184.216.34"],
+        sleeper=lambda _: None,
+    )
+
+    page = scraper.scrape_public_url("https://example.com/about")
+
+    assert page.markdown == "# Public profile"
+    assert page.title == "Profile"
+    assert seen == {"url": "https://example.com/about", "formats": ["markdown"], "onlyMainContent": True}
 
 
 def test_ingest_scraped_page_stores_a_document_and_completes_the_job(client, session):

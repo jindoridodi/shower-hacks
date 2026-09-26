@@ -215,6 +215,7 @@ Copy `.env.example` to `.env` and configure:
 
 ```text
 FIRECRAWL_API_KEY=
+APIFY_API_TOKEN=
 DATABASE_URL=sqlite:///./data/borrowed_intimacy.db
 REDIS_URL=redis://localhost:6379/0
 LLM_API_KEY=
@@ -340,6 +341,8 @@ Communication drafts must not claim to be written by the target, use the target'
 ## Backend slice
 
 The FastAPI service in `apps/api` covers projects, manually supplied public URLs, crawl jobs, documents, searchable chunks, and claim-to-source evidence. Pages are stored when a caller supplies text or a `ScrapedPage`. The Firecrawl client itself is a plug-in point in `apps/api/services/firecrawl.py`.
+
+`POST /instagram/profiles` accepts one public Instagram username and returns a normalized profile plus up to 10 recent caption-bearing posts from Apify's `apify/instagram-profile-scraper`. It returns image URLs but does not download or analyze images.
 
 ### Setup
 
@@ -483,5 +486,15 @@ Every claim-source row stores an excerpt. The source must belong to the report's
 `docs/04-integration-contract.md` and `docs/06-team-integration-playbook.md` describe a thinner HTTP surface under `/api/...`, crawl statuses such as `complete` and `partial`, and a `claims` table. This slice follows the source-ledger brief: `/sources` and `/crawls`, statuses `queued`, `running`, `succeeded`, and `failed`, and `report_claims`. Agree on one contract before the frontend binds to field names.
 
 ## License
+
+### People search handoff
+
+The current Firecrawl search implementation is intentionally deferred to the
+other branch. The latest candidate URL fixture is
+[`documents/people-search-urls.json`](documents/people-search-urls.json). It
+contains the URLs to feed into the merged search/scrape workflow later.
+
+The shared output contract remains documented in
+[`docs/tests/people-search-schema.md`](docs/tests/people-search-schema.md).
 
 Add the project’s license before public release.

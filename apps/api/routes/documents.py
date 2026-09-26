@@ -26,6 +26,7 @@ def create_document(
         source_id=payload.source_id,
         title=payload.title,
         content_type=payload.content_type,
+        raw_path=payload.raw_path,
         raw_text=payload.raw_text,
         cleaned_text=payload.cleaned_text,
         sensitivity_status=payload.sensitivity_status.value,
