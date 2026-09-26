@@ -157,6 +157,9 @@ ON report_claims (report_id, position);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crawl_jobs_one_active
 ON crawl_jobs (source_id)
 WHERE status IN ('queued', 'running');
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_claim_sources_claim_source_excerpt
+ON claim_sources (claim_id, source_id, excerpt);
 CREATE TABLE source_approvals (
     id TEXT PRIMARY KEY,
     source_id TEXT NOT NULL UNIQUE REFERENCES sources (id) ON DELETE CASCADE,
