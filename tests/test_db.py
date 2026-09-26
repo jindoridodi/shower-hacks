@@ -34,7 +34,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     database_path = tmp_path / "app.db"
     first = apply_migrations(database_path)
     second = apply_migrations(database_path)
-    assert first == ["001_initial", "002_uniqueness"]
+    assert first == ["001_initial", "002_uniqueness", "003_claim_source_excerpt"]
     assert second == []
 
     connection = sqlite3.connect(database_path)
@@ -56,9 +56,10 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     finally:
         connection.close()
     assert REQUIRED_TABLES <= names
-    assert versions == ["001_initial", "002_uniqueness"]
+    assert versions == ["001_initial", "002_uniqueness", "003_claim_source_excerpt"]
     assert "uq_report_claims_report_position" in indexes
     assert "uq_crawl_jobs_one_active" in indexes
+    assert "uq_claim_sources_claim_source_excerpt" in indexes
 
 
 def test_create_app_can_open_the_same_database_twice(tmp_path):

@@ -2,6 +2,49 @@
 
 ## API endpoints
 
+This process serves three documented surfaces. Paths are not interchangeable: OSINT projects live in a separate SQLite file from the corpus ledger.
+
+### Corpus ledger
+
+Database: `data/borrowed_intimacy.db`, created by `db/migrations`.
+
+```text
+POST /projects
+GET  /projects/{project_id}
+POST /sources
+GET  /sources?project_id=
+GET  /sources/{source_id}
+POST /sources/{source_id}/queue
+POST /crawls
+GET  /crawls?source_id=
+GET  /crawls/{crawl_id}
+PATCH /crawls/{crawl_id}
+POST /documents
+GET  /documents/{document_id}
+POST /documents/{document_id}/chunks
+GET  /documents/{document_id}/chunks
+GET  /search/chunks?q=
+POST /reports
+GET  /reports/{report_id}
+POST /reports/{report_id}/claims
+POST /report-claims/{claim_id}/sources
+POST /api/projects/{project_id}/crawls
+GET  /api/crawls/{crawl_id}
+PATCH /api/crawls/{crawl_id}
+GET  /api/projects/{project_id}/corpus
+POST /api/projects/{project_id}/reports/persisted
+GET  /api/reports/{report_id}
+GET  /health
+```
+
+The `/api/projects/{project_id}/crawls`, `/api/crawls/{crawl_id}`, `/api/projects/{project_id}/corpus`, and `/api/reports/{report_id}` routes are aliases over the same corpus records as the unprefixed routes. `POST /api/projects/{project_id}/reports/persisted` writes a generated report into `reports`, `report_claims`, and `claim_sources`.
+
+`POST /api/projects` and `POST /api/projects/{project_id}/sources` are not corpus aliases. Those paths belong to the OSINT surface below.
+
+### OSINT manual sources
+
+Database: `OSINT_DATABASE_URL`, default `sqlite:///./data/osint_sources.db`.
+
 ```text
 POST /api/projects
 GET  /api/projects
@@ -12,40 +55,56 @@ GET  /api/enrichment/spiderfoot/{job_id}
 POST /api/projects/{project_id}/sources
 GET  /api/projects/{project_id}/sources?username={username}
 DELETE /api/projects/{project_id}/sources/{source_id}
-POST /api/projects/{project_id}/crawls
-GET  /api/crawls/{crawl_id}
-GET  /api/projects/{project_id}/sources
-GET  /api/projects/{project_id}/corpus
-POST /api/projects/{project_id}/reports
-POST /api/projects/{project_id}/drafts
-GET  /api/reports/{report_id}
 GET  /api/health
 ```
 
-## Crawl response
+### Generation
+
+`POST /api/projects/{project_id}/reports` and `POST /api/projects/{project_id}/drafts` return generated JSON. They do not write the corpus database. Pass `useFixtures: true` to skip the model provider. To store a generated report, call `POST /api/projects/{project_id}/reports/persisted` with the report object and the excerpts that were used.
+
+## Crawl job
+
+A crawl job belongs to one corpus source. Status values are `queued`, `running`, `succeeded`, and `failed`. `complete` and `partial` are not crawl statuses. `partial` on `POST /api/discovery` is a separate boolean for provider failures.
 
 ```json
 {
-  "crawl_id": "crawl_001",
+  "id": "crawl_001",
+  "source_id": "source_001",
   "status": "queued",
-  "source_count": 3,
-  "error": null
+  "error_message": null,
+  "started_at": null,
+  "completed_at": null,
+  "created_at": "2026-09-26T18:00:00.000000+00:00",
+  "updated_at": "2026-09-26T18:00:00.000000+00:00"
 }
 ```
 
+`POST /api/projects/{project_id}/crawls` accepts `{ "source_id": "..." }`. The source must belong to that corpus project.
+
 ## Error response
+
+Corpus errors use one envelope:
 
 ```json
 {
-  "error": {
-    "code": "CRAWL_FAILED",
-    "message": "The page could not be retrieved.",
-    "retryable": true
+  "detail": {
+    "code": "crawl_already_active",
+    "message": "This source already has a queued or running crawl"
   }
 }
 ```
 
-Keep endpoint names and response fields stable after frontend integration starts.
+Request validation uses the code `validation_error`. OSINT routes that raise FastAPI `HTTPException` put a string in `detail` instead of this object.
+
+## Stored report fields
+
+Corpus claims are stored as `claim_text` plus `claim_sources.excerpt`. The persisted route accepts the generation field names `claimType` and `sourceIds`, and stores an excerpt for every cited source. `unknown` claims and `unknowns` are stored as claims with no `claim_sources` rows. Contradictions and `generatedAt` are not stored. There is no `partial` citation state.
+
+Sensitivity values `sensitive`, `restricted`, and `redacted` are rejected. A citation is also rejected when the excerpt appears in a `sensitive` or `redacted` document, or when the source's current document has one of those statuses. `safe`, `clear`, and `unreviewed` may be cited.
+
+## Schema names
+
+`documents.raw_text` is the stored page body. There is no `documents.raw_path`. `document_chunks.text` is the chunk body. Search uses the `document_chunks_fts` virtual table, which is kept in sync by triggers. There is no `document_chunks.fts_text` column and no `document_chunks.embedding` column. Embeddings and vector search are outside this milestone.
 
 ## Discovery response
 

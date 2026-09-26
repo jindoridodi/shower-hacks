@@ -412,6 +412,12 @@ Request validation uses the code `validation_error`.
 | `GET` | `/reports/{report_id}` | Fetch a report with claims and excerpts |
 | `POST` | `/reports/{report_id}/claims` | Add a claim and optional source excerpts |
 | `POST` | `/report-claims/{claim_id}/sources` | Link another source excerpt to a claim |
+| `POST` | `/api/projects/{project_id}/crawls` | Queue a crawl when the source belongs to that corpus project |
+| `GET` | `/api/crawls/{crawl_id}` | Fetch the same crawl job as `GET /crawls/{crawl_id}` |
+| `PATCH` | `/api/crawls/{crawl_id}` | Same status update as `PATCH /crawls/{crawl_id}` |
+| `GET` | `/api/projects/{project_id}/corpus` | List corpus sources, documents, and chunks |
+| `POST` | `/api/projects/{project_id}/reports/persisted` | Store a generated report and its excerpts |
+| `GET` | `/api/reports/{report_id}` | Fetch the same stored report as `GET /reports/{report_id}` |
 
 Source creation body:
 
@@ -480,7 +486,9 @@ Every claim-source row stores an excerpt. The source must belong to the report's
 6. Handle redirects explicitly. `ingest_scraped_page` accepts a page only when its URL canonicalizes to the source URL.
 7. Chunking and sensitivity classification stay outside ingest. The stored document remains `unreviewed` until a later filter updates `sensitivity_status`.
 
-`docs/04-integration-contract.md` and `docs/06-team-integration-playbook.md` describe a thinner HTTP surface under `/api/...`, crawl statuses such as `complete` and `partial`, and a `claims` table. This slice follows the source-ledger brief: `/sources` and `/crawls`, statuses `queued`, `running`, `succeeded`, and `failed`, and `report_claims`. Agree on one contract before the frontend binds to field names.
+The corpus contract is documented in `docs/04-integration-contract.md`. Crawl jobs use `queued`, `running`, `succeeded`, and `failed`. `complete` and `partial` are not crawl statuses. Corpus errors use `{"detail": {"code", "message"}}`. `POST /api/projects` remains the OSINT project route and writes a different database. `POST /api/projects/{project_id}/reports/persisted` stores a generated report; `POST /api/projects/{project_id}/reports` only generates one.
+
+Stored pages use `documents.raw_text` and `documents.cleaned_text`. Chunks use `document_chunks.text`, and search reads `document_chunks_fts`. There is no `raw_path`, `fts_text`, or `embedding` column.
 
 ## License
 
