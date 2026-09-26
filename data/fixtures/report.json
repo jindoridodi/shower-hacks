@@ -1,0 +1,32 @@
+{
+  "id": "report_fixture_001",
+  "title": "Fixture evidence report",
+  "claims": [
+    {
+      "id": "claim_fixture_001",
+      "text": "Avery Chen describes their work as design and research focused on public archives and community storytelling.",
+      "claimType": "observed",
+      "confidence": 0.92,
+      "sourceIds": ["src_portfolio"]
+    },
+    {
+      "id": "claim_fixture_002",
+      "text": "The corpus suggests a recurring interest in public archival material.",
+      "claimType": "inferred",
+      "confidence": 0.73,
+      "sourceIds": ["src_portfolio", "src_project"]
+    },
+    {
+      "id": "claim_fixture_003",
+      "text": "The available sources identify a public presentation in 2025 but do not establish whether similar presentations are recurring.",
+      "claimType": "uncertain",
+      "confidence": 0.58,
+      "sourceIds": ["src_talk"]
+    }
+  ],
+  "contradictions": [],
+  "unknowns": [
+    "The corpus does not establish future projects, private plans, or a complete work history."
+  ],
+  "generatedAt": "2026-09-26T18:00:00Z"
+}
