@@ -6,5 +6,6 @@
 - `002_raw_document_contract.sql` — `documents.raw_path`, `document_chunks.embedding`, `document_chunks.fts_text`
 - `002_uniqueness.sql` — one active crawl per source, unique claim positions
 - `003_claim_source_excerpt.sql` — one excerpt row per claim, source, and excerpt text
+- `003_source_approvals.sql` — approval provenance for a canonical source
 
 Do not edit a file after it has been applied. Add a new file. `scripts/reset_db.py` deletes only the local corpus database.

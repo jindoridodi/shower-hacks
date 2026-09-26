@@ -11,6 +11,7 @@ from apps.api.main import create_app
 REQUIRED_TABLES = {
     "projects",
     "sources",
+    "source_approvals",
     "crawl_jobs",
     "documents",
     "document_chunks",
@@ -39,6 +40,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
         "002_raw_document_contract",
         "002_uniqueness",
         "003_claim_source_excerpt",
+        "003_source_approvals",
     ]
     assert second == []
 
@@ -66,6 +68,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
         "002_raw_document_contract",
         "002_uniqueness",
         "003_claim_source_excerpt",
+        "003_source_approvals",
     ]
     assert "uq_report_claims_report_position" in indexes
     assert "uq_crawl_jobs_one_active" in indexes

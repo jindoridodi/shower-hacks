@@ -47,6 +47,24 @@ class Source(Base):
     crawl_jobs: Mapped[list[CrawlJob]] = relationship(back_populates="source")
     documents: Mapped[list[Document]] = relationship(back_populates="source")
     claim_links: Mapped[list[ClaimSource]] = relationship(back_populates="source")
+    approval: Mapped[SourceApproval | None] = relationship(back_populates="source")
+
+
+class SourceApproval(Base):
+    __tablename__ = "source_approvals"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    source_id: Mapped[str] = mapped_column(
+        String, ForeignKey("sources.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    target_username: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)
+    confidence: Mapped[str] = mapped_column(String, nullable=False)
+    match_reason: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_evidence: Mapped[str] = mapped_column(Text, nullable=False)
+    approved_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    source: Mapped[Source] = relationship(back_populates="approval")
 
 
 class CrawlJob(Base):
