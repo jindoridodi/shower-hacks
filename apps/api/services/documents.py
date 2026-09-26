@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from uuid import uuid4
@@ -49,6 +50,7 @@ def stage_document(
     cleaned_text: str | None,
     sensitivity_status: str,
     content_hash: str | None,
+    raw_path: str | None = None,
 ) -> tuple[Document, bool]:
     source = get_source(db, source_id)
     digest = content_digest(cleaned_text=cleaned_text, raw_text=raw_text)
@@ -75,6 +77,7 @@ def stage_document(
         content_hash=digest,
         title=title,
         content_type=content_type,
+        raw_path=raw_path,
         raw_text=raw_text,
         cleaned_text=cleaned_text,
         sensitivity_status=sensitivity_status,
@@ -99,6 +102,7 @@ def create_document(
     sensitivity_status: str,
     content_hash: str | None,
     chunks: list[tuple[int, str]],
+    raw_path: str | None = None,
 ) -> tuple[Document, bool]:
     with transaction(db):
         document, created = stage_document(
@@ -106,6 +110,7 @@ def create_document(
             source_id=source_id,
             title=title,
             content_type=content_type,
+            raw_path=raw_path,
             raw_text=raw_text,
             cleaned_text=cleaned_text,
             sensitivity_status=sensitivity_status,
@@ -149,6 +154,8 @@ def stage_chunks(
             document_id=document.id,
             chunk_index=index,
             text=body,
+            embedding=None,
+            fts_text=body,
             created_at=now,
         )
         db.add(row)

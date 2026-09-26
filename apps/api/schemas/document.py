@@ -12,6 +12,8 @@ class ChunkCreate(BaseModel):
 
     chunk_index: int = Field(ge=0)
     text: str = Field(min_length=1, max_length=20000)
+    embedding: list[float] | None = None
+    fts_text: str | None = Field(default=None, max_length=20000)
 
 
 class ChunkBatchCreate(BaseModel):
@@ -24,6 +26,7 @@ class DocumentCreate(BaseModel):
     source_id: str = Field(min_length=1)
     title: str | None = Field(default=None, max_length=500)
     content_type: str | None = Field(default=None, max_length=200)
+    raw_path: str | None = Field(default=None, max_length=2000)
     raw_text: str | None = Field(default=None, max_length=1_000_000)
     cleaned_text: str | None = Field(default=None, max_length=1_000_000)
     sensitivity_status: SensitivityStatus = SensitivityStatus.unreviewed
@@ -40,7 +43,7 @@ class DocumentCreate(BaseModel):
             raise ValueError("content_hash must be a 64-character sha256 hex digest")
         return lowered
 
-    @field_validator("title", "content_type", "raw_text", "cleaned_text")
+    @field_validator("title", "content_type", "raw_path", "raw_text", "cleaned_text")
     @classmethod
     def blank_optional_is_null(cls, value: str | None) -> str | None:
         if value is None:
@@ -62,6 +65,7 @@ class DocumentRead(BaseModel):
     content_hash: str
     title: str | None
     content_type: str | None
+    raw_path: str | None
     raw_text: str | None
     cleaned_text: str | None
     sensitivity_status: str
@@ -77,6 +81,8 @@ class ChunkRead(BaseModel):
     document_id: str
     chunk_index: int
     text: str
+    embedding: str | None
+    fts_text: str
     created_at: str
 
 

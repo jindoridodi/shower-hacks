@@ -37,6 +37,9 @@ class Settings(BaseSettings):
 
     database_url: str = "sqlite:///./data/borrowed_intimacy.db"
     firecrawl_api_key: str = ""
+    crawl_allowed_urls: str = ""
+    crawl_terms_accepted_hosts: str = ""
+    crawl_requests_per_minute: int = 10
 
     @property
     def database_path(self) -> Path:

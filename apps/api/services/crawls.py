@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from pathlib import Path
 from uuid import uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.api.clock import utc_now
+from apps.api.config import repo_root
 from apps.api.db import transaction
 from apps.api.errors import APIError
 from apps.api.models import CrawlJob, Document, Source
 from apps.api.services.documents import stage_document
-from apps.api.services.firecrawl import ScrapedPage
+from apps.api.services.firecrawl import PublicPageScraper, ScrapedPage, get_public_page_scraper
 from apps.api.services.sources import get_source
+from apps.api.services.hashing import sha256_text
 from apps.api.services.urls import InvalidURL, canonicalize_url
 
 _TRANSITIONS: dict[str, set[str]] = {
@@ -144,6 +147,7 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
     if not markdown:
         raise APIError(422, "empty_document", "Scraped page has no markdown text")
 
+    raw_path = _store_raw_markdown(source.id, markdown)
     now = utc_now()
     with transaction(db):
         if job.started_at is None:
@@ -157,6 +161,7 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
             source_id=source.id,
             title=page.title,
             content_type="text/markdown",
+            raw_path=raw_path,
             raw_text=page.raw_html,
             cleaned_text=markdown,
             sensitivity_status="unreviewed",
@@ -172,3 +177,34 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
         source.updated_at = finished
     db.refresh(document)
     return document
+
+
+def run_queued_crawl(
+    db: Session,
+    crawl_id: str,
+    scraper: PublicPageScraper | None = None,
+) -> Document:
+    """Worker entry point: scrape the queued source and persist its schema-backed result."""
+
+    job = get_crawl(db, crawl_id)
+    if job.status != "queued":
+        raise APIError(409, "invalid_status_transition", "Only queued crawls can be run")
+    source = get_source(db, job.source_id)
+    update_crawl_status(db, crawl_id, "running", None)
+    try:
+        page = (scraper or get_public_page_scraper()).scrape_public_url(source.url)
+        return ingest_scraped_page(db, crawl_id, page)
+    except Exception as error:
+        update_crawl_status(db, crawl_id, "failed", str(error))
+        raise
+
+
+def _store_raw_markdown(source_id: str, markdown: str) -> str:
+    """Persist raw extraction outside SQLite and return a repo-relative path."""
+
+    digest = sha256_text(markdown)
+    relative = Path("data") / "raw" / source_id / f"{digest}.md"
+    destination = repo_root() / relative
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(markdown, encoding="utf-8")
+    return str(relative)

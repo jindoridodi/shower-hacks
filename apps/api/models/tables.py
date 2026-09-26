@@ -79,6 +79,7 @@ class Document(Base):
     content_hash: Mapped[str] = mapped_column(String, nullable=False)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     content_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    raw_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     cleaned_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     sensitivity_status: Mapped[str] = mapped_column(
@@ -107,6 +108,8 @@ class DocumentChunk(Base):
     )
     chunk_index: Mapped[int] = mapped_column(nullable=False)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[str | None] = mapped_column(Text, nullable=True)
+    fts_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[str] = mapped_column(String, nullable=False)
 
     document: Mapped[Document] = relationship(back_populates="chunks")

@@ -373,4 +373,14 @@ Every claim-source row stores an excerpt. The source must belong to the report's
 
 ## License
 
+### People search handoff
+
+The current Firecrawl search implementation is intentionally deferred to the
+other branch. The latest candidate URL fixture is
+[`documents/people-search-urls.json`](documents/people-search-urls.json). It
+contains the URLs to feed into the merged search/scrape workflow later.
+
+The shared output contract remains documented in
+[`docs/tests/people-search-schema.md`](docs/tests/people-search-schema.md).
+
 Add the project’s license before public release.
