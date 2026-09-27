@@ -19,6 +19,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+embeddings = ["sentence-transformers>=3,<6"]
 # External discovery CLIs are optional; the API supports their absence.
 osint = [
     "networkx>=2.8,<3",

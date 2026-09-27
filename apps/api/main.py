@@ -1,4 +1,7 @@
 from pathlib import Path
+from contextlib import asynccontextmanager
+
+from starlette.concurrency import run_in_threadpool
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -9,7 +12,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from apps.api.config import get_settings
+from apps.api.config import Settings, get_settings
+from apps.api.services.embeddings import EmbeddingProvider, prepare_embeddings
 from apps.api.db import apply_migrations, make_engine, make_session_factory
 from apps.api.dependencies import get_db
 from apps.api.errors import APIError
@@ -26,11 +30,23 @@ def create_app(
     database_path: Path | None = None,
     discovery_service: DiscoveryService | None = None,
     source_repository: SQLiteSourceRepository | None = None,
+    settings: Settings | None = None,
+    embedding_provider: EmbeddingProvider | None = None,
 ) -> FastAPI:
-    path = database_path or get_settings().database_path
+    current_settings = settings or get_settings()
+    path = database_path or current_settings.database_path
     apply_migrations(path)
     engine = make_engine(path)
+    @asynccontextmanager
+    async def lifespan(application):
+        def initialize():
+            with application.state.session_factory() as db:
+                application.state.embeddings_prepared = prepare_embeddings(db)
+        await run_in_threadpool(initialize)
+        yield
+
     app = FastAPI(
+        lifespan=lifespan,
         title="Borrowed Intimacy API",
         version="0.1.0",
         summary="Source, crawl, document, discovery, and evidence API",
@@ -45,6 +61,10 @@ def create_app(
     app.state.engine = engine
     app.state.database_path = path
     app.state.session_factory = make_session_factory(engine)
+    app.state.session_factory.configure(info={
+        "embedding_settings": current_settings,
+        "embedding_provider": embedding_provider,
+    })
     app.state.source_repository = source_repository or SQLiteSourceRepository()
     app.state.discovery_service = discovery_service or build_default_service(app.state.source_repository)
     if discovery_service is not None and discovery_service.source_repository is None:
