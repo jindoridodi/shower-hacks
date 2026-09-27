@@ -17,7 +17,7 @@ The default path uses live providers. Add the credentials for the capabilities y
 Requirements: Python 3.11+ and Node.js 20+.
 
 ```bash
-cd /Users/chuu/Desktop/shower-hacks
+cd freakypeeky
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev,osint]'
@@ -43,7 +43,7 @@ Keep secrets in `.env`; do not commit them or put them in frontend code.
 Keep this terminal open:
 
 ```bash
-cd /Users/chuu/Desktop/shower-hacks
+cd freakypeeky
 source .venv/bin/activate
 uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
@@ -63,7 +63,7 @@ Health: <http://127.0.0.1:8000/api/health>
 In a second terminal:
 
 ```bash
-cd /Users/chuu/Desktop/shower-hacks/apps/web
+cd freakypeeky/apps/web
 npm install
 npm run dev
 ```
@@ -77,7 +77,7 @@ Open <http://localhost:3000>.
 Use fixtures for offline work, repeatable demos, or when live providers are unavailable. Restart Uvicorn with:
 
 ```bash
-cd /Users/chuu/Desktop/shower-hacks
+cd freakypeeky
 source .venv/bin/activate
 OSINT_USE_FIXTURES=true INSTAGRAM_USE_FIXTURES=true \
 uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
@@ -135,7 +135,7 @@ The full contract is in [docs/04-integration-contract.md](docs/04-integration-co
 ## Test
 
 ```bash
-cd /Users/chuu/Desktop/shower-hacks
+cd freakypeeky
 source .venv/bin/activate
 python -m pytest
 ```
