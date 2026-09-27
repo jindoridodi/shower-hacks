@@ -17,7 +17,6 @@ The default path uses live providers. Add the credentials for the capabilities y
 Requirements: Python 3.11+ and Node.js 20+.
 
 ```bash
-cd freakypeeky
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e '.[dev,osint]'
@@ -43,7 +42,6 @@ Keep secrets in `.env`; do not commit them or put them in frontend code.
 Keep this terminal open:
 
 ```bash
-cd freakypeeky
 source .venv/bin/activate
 uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
@@ -63,7 +61,7 @@ Health: <http://127.0.0.1:8000/api/health>
 In a second terminal:
 
 ```bash
-cd freakypeeky/apps/web
+cd apps/web
 npm install
 npm run dev
 ```
@@ -77,7 +75,6 @@ Open <http://localhost:3000>.
 Use fixtures for offline work, repeatable demos, or when live providers are unavailable. Restart Uvicorn with:
 
 ```bash
-cd freakypeeky
 source .venv/bin/activate
 OSINT_USE_FIXTURES=true INSTAGRAM_USE_FIXTURES=true \
 uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
@@ -135,7 +132,6 @@ The full contract is in [docs/04-integration-contract.md](docs/04-integration-co
 ## Test
 
 ```bash
-cd freakypeeky
 source .venv/bin/activate
 python -m pytest
 ```
