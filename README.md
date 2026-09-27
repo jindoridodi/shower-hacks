@@ -32,7 +32,6 @@ The project treats discovery results as suggestions, not identity proof. It does
 - Database: SQLite with FTS5
 - Discovery: Sherlock, Maigret, WhatsMyName
 - Instagram: Apify `apify/instagram-profile-scraper`
-- Crawling: Firecrawl adapter for approved public URLs
 - Generation: OpenAI-compatible chat-completions API
 - Graph export: NetworkX to CSV ZIP or GEXF
 - Tests: pytest
@@ -58,7 +57,6 @@ Requirements:
 - Python 3.11+
 - Node.js 20+
 - An optional Apify token for live Instagram lookups
-- An optional Firecrawl key for live crawls
 - An optional OpenAI-compatible API key and model for live generation
 
 Create the Python environment and install the backend:
@@ -88,7 +86,6 @@ LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=
 
 # Optional crawling
-FIRECRAWL_API_KEY=
 CRAWL_ALLOWED_URLS=
 CRAWL_TERMS_ACCEPTED_HOSTS=
 ```
