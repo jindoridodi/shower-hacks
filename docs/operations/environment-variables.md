@@ -3,6 +3,9 @@
 ```text
 FIRECRAWL_API_KEY=
 APIFY_API_TOKEN=
+APIFY_INSTAGRAM_ACTOR=apify~instagram-profile-scraper
+APIFY_INSTAGRAM_TIMEOUT_SECONDS=90
+INSTAGRAM_USE_FIXTURES=false
 DATABASE_URL=sqlite:///./data/borrowed_intimacy.db
 LLM_API_KEY=
 LLM_BASE_URL=

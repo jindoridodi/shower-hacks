@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./data/borrowed_intimacy.db"
     firecrawl_api_key: str = ""
     apify_api_token: str = ""
+    apify_instagram_actor: str = "apify~instagram-profile-scraper"
+    apify_instagram_timeout_seconds: int = 90
+    instagram_use_fixtures: bool = False
     crawl_allowed_urls: str = ""
     crawl_terms_accepted_hosts: str = ""
     crawl_requests_per_minute: int = 10

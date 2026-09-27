@@ -1,0 +1,63 @@
+{
+  "demo.public": {
+    "item": {
+      "username": "demo.public",
+      "fullName": "Public Demo",
+      "biography": "A deterministic public-profile fixture.",
+      "profilePicUrl": "https://images.example.test/demo-public.jpg",
+      "externalUrl": "https://example.test/demo-public",
+      "businessCategoryName": "Creator",
+      "followersCount": 42,
+      "followsCount": 8,
+      "postsCount": 12,
+      "verified": false,
+      "private": false,
+      "latestPosts": [
+        {"caption": "Post 1", "postUrl": "https://www.instagram.com/p/demo01/", "timestamp": "2026-01-01T00:00:00Z", "likesCount": 1, "commentsCount": 0},
+        {"caption": "Post 2", "postUrl": "https://www.instagram.com/p/demo02/", "timestamp": "2026-01-02T00:00:00Z", "likesCount": 2, "commentsCount": 0},
+        {"caption": "Post 3", "postUrl": "https://www.instagram.com/p/demo03/", "timestamp": "2026-01-03T00:00:00Z", "likesCount": 3, "commentsCount": 0},
+        {"caption": "Post 4", "postUrl": "https://www.instagram.com/p/demo04/", "timestamp": "2026-01-04T00:00:00Z", "likesCount": 4, "commentsCount": 0},
+        {"caption": "Post 5", "postUrl": "https://www.instagram.com/p/demo05/", "timestamp": "2026-01-05T00:00:00Z", "likesCount": 5, "commentsCount": 0},
+        {"caption": "Post 6", "postUrl": "https://www.instagram.com/p/demo06/", "timestamp": "2026-01-06T00:00:00Z", "likesCount": 6, "commentsCount": 0},
+        {"caption": "Post 7", "postUrl": "https://www.instagram.com/p/demo07/", "timestamp": "2026-01-07T00:00:00Z", "likesCount": 7, "commentsCount": 0},
+        {"caption": "Post 8", "postUrl": "https://www.instagram.com/p/demo08/", "timestamp": "2026-01-08T00:00:00Z", "likesCount": 8, "commentsCount": 0},
+        {"caption": "Post 9", "postUrl": "https://www.instagram.com/p/demo09/", "timestamp": "2026-01-09T00:00:00Z", "likesCount": 9, "commentsCount": 0},
+        {"caption": "Post 10", "postUrl": "https://www.instagram.com/p/demo10/", "timestamp": "2026-01-10T00:00:00Z", "likesCount": 10, "commentsCount": 0},
+        {"caption": "Post 11", "postUrl": "https://www.instagram.com/p/demo11/", "timestamp": "2026-01-11T00:00:00Z", "likesCount": 11, "commentsCount": 0},
+        {"caption": "", "postUrl": "https://www.instagram.com/p/no-caption/"}
+      ]
+    }
+  },
+  "demo.private": {
+    "item": {
+      "username": "demo.private",
+      "fullName": "Must Be Redacted",
+      "biography": "Must be redacted for a private account.",
+      "profilePicUrl": "https://images.example.test/private.jpg",
+      "externalUrl": "https://example.test/private",
+      "businessCategoryName": "Must Be Redacted",
+      "followersCount": 12,
+      "followsCount": 3,
+      "postsCount": 4,
+      "verified": true,
+      "private": true,
+      "latestPosts": [{"caption": "Must never appear"}]
+    }
+  },
+  "demo.missing": {
+    "error": {
+      "statusCode": 404,
+      "code": "instagram_profile_not_found",
+      "message": "Instagram profile was not found.",
+      "retryable": false
+    }
+  },
+  "demo.unavailable": {
+    "error": {
+      "statusCode": 503,
+      "code": "instagram_provider_unavailable",
+      "message": "Instagram profile provider is temporarily unavailable.",
+      "retryable": true
+    }
+  }
+}

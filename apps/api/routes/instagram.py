@@ -4,7 +4,7 @@ from apps.api.errors import APIError
 from apps.api.schemas.instagram import InstagramProfileRead, InstagramProfileRequest
 from apps.api.services.instagram import (
     ApifyNotConfiguredError,
-    ApifyProfileError,
+    InstagramProfileError,
     get_instagram_profile_scraper,
 )
 
@@ -15,7 +15,5 @@ router = APIRouter(prefix="/instagram", tags=["instagram"])
 def extract_profile(payload: InstagramProfileRequest) -> InstagramProfileRead:
     try:
         return get_instagram_profile_scraper().scrape_profile(payload.username)
-    except ApifyNotConfiguredError as error:
-        raise APIError(503, "apify_not_configured", str(error)) from error
-    except ApifyProfileError as error:
-        raise APIError(error.status_code, "instagram_profile_unavailable", str(error)) from error
+    except (ApifyNotConfiguredError, InstagramProfileError) as error:
+        raise APIError(error.status_code, error.code, error.message, retryable=error.retryable) from error
