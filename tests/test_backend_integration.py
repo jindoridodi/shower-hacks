@@ -84,11 +84,19 @@ def test_public_page_flow_persists_a_cited_report(client, session):
     assert duplicate.json()["id"] == document.id
     assert client.get(f"/sources/{source['id']}").json()["content_hash"] == stored_body["content_hash"]
 
-    chunks = client.post(
+    chunks = client.get(f"/documents/{document.id}/chunks")
+    assert chunks.status_code == 200
+    assert len(chunks.json()) == 1
+    assert chunks.json()[0]["document_id"] == document.id
+    assert chunks.json()[0]["chunk_index"] == 0
+    assert chunks.json()[0]["text"] == _PAGE
+
+    duplicate_chunk = client.post(
         f"/documents/{document.id}/chunks",
         json={"chunks": [{"chunk_index": 0, "text": _PAGE}]},
     )
-    assert chunks.status_code == 201
+    assert duplicate_chunk.status_code == 409
+    assert duplicate_chunk.json()["detail"]["code"] == "duplicate_chunk_index"
     found = client.get("/search/chunks", params={"q": "storytelling", "project_id": project["id"]})
     assert found.status_code == 200
     assert found.json()[0]["text"] == _PAGE

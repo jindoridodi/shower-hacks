@@ -182,7 +182,6 @@ BEGIN
     INSERT INTO document_chunks_fts (chunk_id, text)
     VALUES (new.id, new.text);
 END;
-
 CREATE TABLE source_approvals (
     id TEXT PRIMARY KEY,
     source_id TEXT NOT NULL UNIQUE REFERENCES sources (id) ON DELETE CASCADE,
