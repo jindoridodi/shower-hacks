@@ -1,5 +1,6 @@
 from apps.api.models.tables import (
     Base,
+    ChunkEmbedding,
     ClaimSource,
     CrawlJob,
     Document,
@@ -13,6 +14,7 @@ from apps.api.models.tables import (
 
 __all__ = [
     "Base",
+    "ChunkEmbedding",
     "ClaimSource",
     "CrawlJob",
     "Document",
