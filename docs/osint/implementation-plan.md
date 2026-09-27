@@ -138,7 +138,6 @@ If the backend owner chooses a different package layout, preserve the same modul
 
 ### Defer until after the demo
 
-- SpiderFoot correlation
 - Maltego transforms
 - Gephi exports
 - Wayback Machine and Common Crawl discovery

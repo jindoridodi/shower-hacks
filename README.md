@@ -83,7 +83,6 @@ borrowed-intimacy/
 │   ├── test_retrieval.py
 │   └── test_reports.py
 ├── .env.example
-├── infra/spiderfoot/docker-compose.yml
 ├── package.json
 ├── pyproject.toml
 └── README.md
@@ -129,7 +128,6 @@ borrowed-intimacy/
 - **Metadata inspection:** ExifTool for public image and document metadata
 - **Public media archiving:** yt-dlp only for explicitly public media and permitted use
 - **Public place context:** OpenStreetMap/Nominatim for interpreting places already named in public sources; never for locating a person
-- **OSINT correlation:** SpiderFoot with breach, phone, dark-web, and precise-location modules disabled
 
 ### Infrastructure
 
@@ -229,7 +227,6 @@ WHATS_MY_NAME_DATA_URL=https://raw.githubusercontent.com/WebBreacher/WhatsMyName
 WHATS_MY_NAME_CACHE_TTL_SECONDS=86400
 WHATS_MY_NAME_SITE_TIMEOUT_SECONDS=8
 WHATS_MY_NAME_MAX_CONCURRENCY=20
-SPIDERFOOT_BASE_URL=http://127.0.0.1:5001
 ```
 
 ## How to run the OSINT test service
@@ -298,25 +295,7 @@ curl -X POST http://127.0.0.1:8000/api/discovery \
 
 Live results are candidate username matches, not verified identity matches.
 
-### 4. Run selected-source SpiderFoot enrichment
-
-Start the local SpiderFoot v4.0 sidecar. The repository provides an Apple-Silicon-compatible wrapper because SpiderFoot's upstream v4.0 Alpine/Python 3.8 image cannot build its pinned PyYAML dependency on ARM.
-
-```bash
-docker compose -f infra/spiderfoot/docker-compose.yml up --build -d
-```
-
-After discovery, send only a source you explicitly selected:
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/enrichment/spiderfoot \
-  -H 'Content-Type: application/json' \
-  -d '{"target":"demo-user","targetType":"username","modules":["account_discovery"]}'
-```
-
-SpiderFoot findings are not candidates automatically and never trigger Firecrawl.
-
-### 5. Run automated tests
+### 4. Run automated tests
 
 ```bash
 python -m pytest

@@ -25,7 +25,7 @@ Already present:
 - Candidate normalization, deduplication, confidence scoring, and fixture mode.
 - Manual project/source saving.
 - Instagram profile extraction through Apify at `POST /instagram/profiles`.
-- Gephi export and a bounded SpiderFoot adapter.
+- Gephi export.
 
 Still needed:
 
