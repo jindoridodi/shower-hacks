@@ -162,7 +162,7 @@ The worker only claims approved, allowlisted queued jobs. It records a terminal
 failure when Firecrawl is unavailable or retrieval fails, without logging
 credentials or crawled content.
 
-`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download. SpiderFoot enrichment only accepts an explicitly selected public URL, username, or domain and never starts a crawl.
+`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download.
 
 ## Instagram profile response
 

@@ -15,7 +15,7 @@ After any row exists in `document_chunks`, deleting that chunk, its document, it
 Two backends sit in the same process and do not talk to each other.
 
 - Projects, sources, crawls, documents, and stored reports live in `data/borrowed_intimacy.db`. Routes are `/projects`, `/sources`, `/crawls`, `/documents`, and `/reports`. Document sensitivity values are `unreviewed`, `clear`, `sensitive`, and `redacted`.
-- Discovery, saved links, generation, graph export, and SpiderFoot use a second SQLite file and `/api/...` routes. Generation only accepts excerpts whose `sensitivityStatus` is `safe`.
+- Discovery, saved links, generation, and graph export use a second SQLite file and `/api/...` routes. Generation only accepts excerpts whose `sensitivityStatus` is `safe`.
 
 `POST /api/projects/{project_id}/reports` and `POST /api/projects/{project_id}/drafts` discard `project_id` and never read stored documents. A request with an empty body returns “No evidence available” even when that project has pages.
 
@@ -50,9 +50,9 @@ There is no overall deadline. One username query fans out across the whole datas
 
 ## Medium
 
-### `.env` does not configure discovery or SpiderFoot
+### `.env` does not configure discovery
 
-`apps/api/config.py` loads `DATABASE_URL` and the LLM fields from `.env`. Sherlock, Maigret, WhatsMyName, SpiderFoot, `OSINT_USE_FIXTURES`, and `OSINT_DATABASE_URL` are read with `os.getenv`. Nothing calls `load_dotenv`, so those values in `.env` are ignored and the process defaults stay in effect.
+`apps/api/config.py` loads `DATABASE_URL` and the LLM fields from `.env`. Sherlock, Maigret, WhatsMyName, `OSINT_USE_FIXTURES`, and `OSINT_DATABASE_URL` are read with `os.getenv`. Nothing calls `load_dotenv`, so those values in `.env` are ignored and the process defaults stay in effect.
 
 The OSINT database path is relative to the process working directory. The corpus database path is anchored at the repository root. Starting the API from another directory uses a different OSINT file than scripts run from the repo root.
 

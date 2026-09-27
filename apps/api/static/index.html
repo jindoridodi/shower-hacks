@@ -60,12 +60,6 @@
       .actions button { padding: 10px 12px; }
       .secondary { background: transparent; color: var(--ink); }
       .secondary:hover { color: white; }
-      .enrichment { border-top: 2px solid var(--ink); margin-top: 32px; padding-top: 18px; }
-      .enrichment h2 { font-size: .82rem; font-weight: 400; letter-spacing: .05em; margin: 0 0 8px; text-transform: uppercase; }
-      .enrichment p { color: var(--muted); font-size: .78rem; line-height: 1.5; }
-      .module-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-      .module-list label { border: 1px solid var(--line); font-size: .72rem; padding: 7px; }
-      .module-list input { width: auto; }
       .project-panel { background: #fffefa; border: 1px solid var(--line); margin: 18px 0 24px; padding: 14px; }
       .manual-source { background: #fffefa; border: 1px solid var(--line); margin-top: 22px; padding: 16px; }
       .project-panel h2, .manual-source h2 { font-size: .78rem; font-weight: 400; letter-spacing: .05em; margin: 0 0 12px; text-transform: uppercase; }
@@ -121,21 +115,6 @@
         <button id="export-csv" type="button" class="secondary">export graph (CSV ZIP)</button>
         <button id="export-gexf" type="button" class="secondary">export graph (GEXF)</button>
       </div>
-      <section id="enrichment" class="enrichment hidden" aria-live="polite">
-        <h2>Selected-source enrichment</h2>
-        <p id="selected-source"></p>
-        <div class="module-list">
-          <label><input type="checkbox" name="sf-module" value="account_discovery" checked /> account discovery</label>
-          <label><input type="checkbox" name="sf-module" value="public_metadata" /> public metadata</label>
-          <label><input type="checkbox" name="sf-module" value="domain_provenance" /> domain provenance</label>
-        </div>
-        <div class="actions">
-          <button id="run-enrichment" type="button">run SpiderFoot</button>
-          <button id="refresh-enrichment" type="button" class="secondary hidden">refresh status</button>
-        </div>
-        <p id="enrichment-status"></p>
-        <div id="enrichment-results"></div>
-      </section>
       <footer>Candidate URLs are suggestions. Select only the sources you intend to crawl.</footer>
     </main>
 
@@ -159,15 +138,7 @@
       const exportCsv = document.querySelector('#export-csv');
       const exportGexf = document.querySelector('#export-gexf');
       const graphActions = document.querySelector('#graph-actions');
-      const enrichment = document.querySelector('#enrichment');
-      const selectedSource = document.querySelector('#selected-source');
-      const runEnrichment = document.querySelector('#run-enrichment');
-      const refreshEnrichment = document.querySelector('#refresh-enrichment');
-      const enrichmentStatus = document.querySelector('#enrichment-status');
-      const enrichmentResults = document.querySelector('#enrichment-results');
       let latestDiscovery = null;
-      let selectedCandidate = null;
-      let enrichmentJob = null;
       const PROJECT_STORAGE_KEY = 'borrowed-intimacy-project-id';
 
       function activeProjectId() { return projectSelect.value || null; }
@@ -210,14 +181,14 @@
         const candidates = data.candidates.map((candidate) => {
           const saved = savedByUrl.get(candidate.url);
           return `
-          <article class="candidate ${selectedCandidate?.url === candidate.url ? 'selected' : ''}">
+          <article class="candidate">
             <div class="candidate-top">
               <span class="badge ${escaped(candidate.confidence)}">${escaped(candidate.confidence)}</span>
               <span class="badge">${escaped(candidate.platform)}</span>
             </div>
             <a href="${escaped(candidate.url)}" target="_blank" rel="noreferrer">${escaped(candidate.url)}</a>
             <div class="reason">${escaped(candidate.matchReason)} · evidence: ${escaped((data.providerEvidence[candidate.url] || []).join(', ') || 'direct input')}</div>
-            <div class="actions"><button type="button" class="secondary select-source" data-url="${escaped(candidate.url)}">select source</button>${saved ? `<button type="button" class="secondary remove-source" data-source-id="${escaped(saved.sourceId)}">remove saved link</button>` : ''}</div>
+            ${saved ? `<div class="actions"><button type="button" class="secondary remove-source" data-source-id="${escaped(saved.sourceId)}">remove saved link</button></div>` : ''}
           </article>
         `;
         }).join('');
@@ -276,16 +247,6 @@
           removeSavedSource(remove.dataset.sourceId);
           return;
         }
-        const button = event.target.closest('.select-source');
-        if (!button || !latestDiscovery) return;
-        selectedCandidate = latestDiscovery.candidates.find((candidate) => candidate.url === button.dataset.url);
-        enrichmentJob = null;
-        enrichment.classList.remove('hidden');
-        selectedSource.textContent = `Selected public source: ${selectedCandidate.url}`;
-        enrichmentStatus.textContent = 'Choose bounded modules, then explicitly start SpiderFoot.';
-        enrichmentResults.innerHTML = '';
-        refreshEnrichment.classList.add('hidden');
-        render(latestDiscovery);
       });
 
       newProjectToggle.addEventListener('click', () => {
@@ -368,47 +329,6 @@
       }
       exportCsv.addEventListener('click', () => exportGraph('csv'));
       exportGexf.addEventListener('click', () => exportGraph('gexf'));
-
-      function selectedModules() {
-        return [...document.querySelectorAll('input[name="sf-module"]:checked')].map((input) => input.value);
-      }
-
-      runEnrichment.addEventListener('click', async () => {
-        if (!selectedCandidate) return;
-        const modules = selectedModules();
-        if (!modules.length) { enrichmentStatus.textContent = 'Select at least one bounded module.'; return; }
-        runEnrichment.disabled = true;
-        enrichmentStatus.textContent = 'Starting SpiderFoot for the selected public source…';
-        try {
-          const response = await fetch('/api/enrichment/spiderfoot', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ target: selectedCandidate.url, targetType: 'url', modules }),
-          });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || 'SpiderFoot could not start. Is the local sidecar running?');
-          enrichmentJob = data.jobId;
-          enrichmentStatus.textContent = `SpiderFoot ${data.status}: ${data.jobId}`;
-          refreshEnrichment.classList.remove('hidden');
-        } catch (error) {
-          enrichmentStatus.textContent = error.message || 'SpiderFoot request failed.';
-        } finally {
-          runEnrichment.disabled = false;
-        }
-      });
-
-      refreshEnrichment.addEventListener('click', async () => {
-        if (!enrichmentJob || !selectedCandidate) return;
-        enrichmentStatus.textContent = 'Refreshing SpiderFoot status…';
-        try {
-          const response = await fetch(`/api/enrichment/spiderfoot/${encodeURIComponent(enrichmentJob)}?target=${encodeURIComponent(selectedCandidate.url)}`);
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.detail || 'SpiderFoot status request failed.');
-          enrichmentStatus.textContent = `SpiderFoot ${data.status} · ${data.findings.length} public URL findings`;
-          enrichmentResults.innerHTML = data.findings.map((finding) => `<p class="reason">${escaped(finding.value)} · ${escaped(finding.confidence)}</p>`).join('') || '<p class="reason">No permitted public URL findings yet.</p>';
-        } catch (error) {
-          enrichmentStatus.textContent = error.message || 'Unable to refresh SpiderFoot status.';
-        }
-      });
 
       loadProjects().catch((error) => { projectStatus.textContent = error.message || 'Unable to load projects.'; });
     </script>

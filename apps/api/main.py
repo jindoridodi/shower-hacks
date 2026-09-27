@@ -15,7 +15,6 @@ from apps.api.dependencies import get_db
 from apps.api.errors import APIError
 from apps.api.routes import crawls, documents, generation, instagram, integration, projects, reports, sources
 from apps.api.routes.discovery import router as discovery_router
-from apps.api.routes.enrichment import router as enrichment_router
 from apps.api.routes.graph import router as graph_router
 from apps.api.routes.manual_sources import router as manual_sources_router
 from apps.api.services.discovery.service import DiscoveryService, build_default_service
@@ -60,7 +59,6 @@ def create_app(
     app.include_router(generation.router)
     app.include_router(discovery_router)
     app.include_router(graph_router)
-    app.include_router(enrichment_router)
     app.include_router(manual_sources_router)
     _register_handlers(app)
 

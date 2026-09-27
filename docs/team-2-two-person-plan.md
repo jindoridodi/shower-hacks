@@ -21,7 +21,7 @@ Already implemented:
 - Public URL normalization, deduplication, confidence scoring, warnings, and fixture mode.
 - An Instagram profile endpoint backed by Apify.
 - A separate OSINT project/source store for manually saved public URLs.
-- Gephi export and a bounded SpiderFoot adapter.
+- Gephi export.
 - Unit tests for core provider parsing and Instagram normalization.
 
 Important integration gap:
@@ -39,7 +39,7 @@ The OSINT project/source store is separate from Team 3's main project/source/cra
 | Private-profile policy | Joint decision | Joint decision |
 | Fixtures | Discovery fixtures | Instagram fixtures |
 | Tests | Discovery/approval tests | Instagram/live-config tests |
-| SpiderFoot/Gephi | Own | Review/test |
+| Gephi | Own | Review/test |
 | Team 1 handoff | Discovery contract | Instagram contract |
 
 ## Step 0 — Joint contract freeze
@@ -122,13 +122,10 @@ The result must identify the canonical Team 3 source record and preserve the sel
 - [x] Test approval rejects mismatched username or unsafe URL.
 - [x] Test approval does not create a crawl job.
 
-### A4 — Optional enrichment boundary
+### A4 — Graph export boundary
 
 - [ ] Verify Gephi CSV ZIP output contains stable nodes and edges.
 - [ ] Verify GEXF is valid and opens in Gephi.
-- [ ] Verify SpiderFoot is disabled or unavailable unless explicitly configured.
-- [ ] Verify SpiderFoot accepts only allowlisted modules and local sidecar access.
-- [ ] Verify SpiderFoot results cannot automatically become crawl sources.
 
 ### A handoff package
 
