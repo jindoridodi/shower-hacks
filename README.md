@@ -27,7 +27,6 @@ The project treats discovery results as suggestions, not identity proof. It does
 - Live username providers and Apify can be rate-limited or blocked by their upstream services.
 - Crawl jobs and report generation require configured sources, approved URLs, and their respective provider keys.
 - The OSINT saved-link store and corpus/source workflow are currently separate SQLite-backed slices that still need end-to-end consolidation.
-- SpiderFoot is not part of this project.
 
 ## Stack
 
@@ -96,8 +95,6 @@ CRAWL_TERMS_ACCEPTED_HOSTS=
 ```
 
 Keep secrets in `.env`; never place them in frontend code or commit them.
-
-`SPIDERFOOT_*` entries still present in `.env.example` are unused legacy settings and can be ignored.
 
 ## Run the API
 
