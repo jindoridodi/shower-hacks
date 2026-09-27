@@ -1,11 +1,10 @@
-"""Use main's persistent FTS5 search and its existing optional project scope.
+"""Retrieve chunks through the backend's persistent SQLite FTS5 index."""
+from sqlalchemy.orm import Session
 
-Requires main's SQLAlchemy services at integration time; no temporary index or
-additional sensitivity/source restrictions are applied here.
-"""
+from .documents import ChunkHit, search_chunks as document_search_chunks
 
 
-def search_chunks(db, query: str, *, project_id: str | None = None, limit: int = 20):
-    from .documents import search_chunks as main_search_chunks
-
-    return main_search_chunks(db, query, project_id=project_id, limit=limit)
+def search_chunks(
+    db: Session, query: str, *, project_id: str | None = None, limit: int = 20
+) -> list[ChunkHit]:
+    return document_search_chunks(db, query, project_id=project_id, limit=limit)

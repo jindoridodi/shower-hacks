@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint, text
+from sqlalchemy import JSON, CheckConstraint, ForeignKey, Index, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -113,6 +113,16 @@ class Document(Base):
     )
     created_at: Mapped[str] = mapped_column(String, nullable=False)
     updated_at: Mapped[str] = mapped_column(String, nullable=False)
+
+    processing_metadata: Mapped[dict[str, str]] = mapped_column(
+        JSON, nullable=False, default=dict, server_default=text("'{}'")
+    )
+    sensitivity_findings: Mapped[list[dict[str, str]]] = mapped_column(
+        JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
+    metadata_findings: Mapped[list[dict[str, str]]] = mapped_column(
+        JSON, nullable=False, default=list, server_default=text("'[]'")
+    )
 
     source: Mapped[Source] = relationship(back_populates="documents")
     chunks: Mapped[list[DocumentChunk]] = relationship(

@@ -51,6 +51,9 @@ def stage_document(
     sensitivity_status: str,
     content_hash: str | None,
     raw_path: str | None = None,
+    processing_metadata: dict[str, str] | None = None,
+    sensitivity_findings: list[dict[str, str]] | None = None,
+    metadata_findings: list[dict[str, str]] | None = None,
 ) -> tuple[Document, bool]:
     source = get_source(db, source_id)
     digest = content_digest(cleaned_text=cleaned_text, raw_text=raw_text)
@@ -85,6 +88,9 @@ def stage_document(
         raw_text=raw_text,
         cleaned_text=cleaned_text,
         sensitivity_status=sensitivity_status,
+        processing_metadata=processing_metadata or {},
+        sensitivity_findings=sensitivity_findings or [],
+        metadata_findings=metadata_findings or [],
         created_at=now,
         updated_at=now,
     )

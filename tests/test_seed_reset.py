@@ -50,6 +50,7 @@ def test_seed_is_idempotent_and_reset_clears_only_the_dev_database(tmp_path):
             "002_raw_document_contract",
             "002_uniqueness",
             "003_claim_source_excerpt",
+            "003_document_processing",
             "003_source_approvals",
         ]
     finally:

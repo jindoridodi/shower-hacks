@@ -76,7 +76,7 @@ def test_ingest_scraped_page_stores_a_document_and_completes_the_job(client, ses
     stored = client.get(f"/documents/{document.id}")
     assert stored.status_code == 200
     assert stored.json()["cleaned_text"] == "Public bio text"
-    assert stored.json()["sensitivity_status"] == "unreviewed"
+    assert stored.json()["sensitivity_status"] == "clear"
     assert stored.json()["title"] == "About"
     assert stored.json()["content_type"] == "text/markdown"
 
