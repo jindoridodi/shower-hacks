@@ -8,8 +8,6 @@ GET  /api/projects
 POST /instagram/profiles
 POST /api/discovery
 POST /api/graph/export?format=csv|gexf
-POST /api/enrichment/spiderfoot
-GET  /api/enrichment/spiderfoot/{job_id}
 POST /api/projects/{project_id}/sources
 GET  /api/projects/{project_id}/sources?username={username}
 DELETE /api/projects/{project_id}/sources/{source_id}
@@ -68,7 +66,7 @@ Username discovery always runs Sherlock, Maigret, and WhatsMyName. Empty candida
 
 `POST /api/projects/{project_id}/sources` accepts `{ "username": "demo-user", "url": "https://example.com/profile" }`. URLs must be direct public HTTP(S) URLs; saving does not fetch, crawl, or enrich them.
 
-`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download. SpiderFoot enrichment only accepts an explicitly selected public URL, username, or domain and never starts a crawl.
+`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download.
 
 ## Instagram profile response
 
