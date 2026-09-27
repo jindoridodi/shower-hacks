@@ -40,7 +40,40 @@ def test_health() -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
+    assert body["database"] == "ok"
     assert "llmConfigured" in body
+    assert body["crawlWorkerCommand"] == "python -m workers.crawl_worker --once"
+
+
+def test_canonical_project_source_and_crawl_routes() -> None:
+    client = make_client()
+    project = client.post("/api/projects", json={"name": "Ledger project"})
+    assert project.status_code == 201
+    project_id = project.json()["id"]
+    assert [item["id"] for item in client.get("/api/projects").json()] == [project_id]
+
+    source = client.post(
+        f"/api/projects/{project_id}/sources", json={"url": "https://example.com/public"}
+    )
+    assert source.status_code == 201
+    source_id = source.json()["id"]
+    assert client.post(
+        f"/api/projects/{project_id}/crawls", json={"source_id": source_id}
+    ).status_code == 409
+
+    approved = client.patch(
+        f"/api/projects/{project_id}/sources/{source_id}/approval",
+        json={"approval_status": "approved"},
+    )
+    assert approved.status_code == 200
+    assert approved.json()["is_allowlisted"] is True
+    queued = client.post(
+        f"/api/projects/{project_id}/crawls", json={"source_id": source_id}
+    )
+    assert queued.status_code == 201
+    assert client.get(f"/api/crawls/{queued.json()['id']}").json()["status"] == "queued"
+
+    assert client.delete(f"/api/projects/{project_id}/sources/{source_id}").status_code == 204
 
 
 def test_osint_test_ui_is_served_from_root() -> None:
@@ -81,11 +114,11 @@ def test_discovery_automatically_detects_public_urls() -> None:
 
 def test_manual_public_source_is_project_scoped_and_merges_into_discovery() -> None:
     client = make_client()
-    first_project = client.post("/api/projects", json={"name": "First"}).json()["projectId"]
-    second_project = client.post("/api/projects", json={"name": "Second"}).json()["projectId"]
+    first_project = client.post("/api/osint/projects", json={"name": "First"}).json()["projectId"]
+    second_project = client.post("/api/osint/projects", json={"name": "Second"}).json()["projectId"]
 
     saved = client.post(
-        f"/api/projects/{first_project}/sources",
+        f"/api/osint/projects/{first_project}/sources",
         json={"username": "Demo-User", "url": "https://Example.com/profile/?utm_source=test#bio"},
     )
     assert saved.status_code == 201
@@ -113,29 +146,29 @@ def test_manual_public_source_is_project_scoped_and_merges_into_discovery() -> N
 
 def test_manual_source_validation_duplicate_listing_and_deletion() -> None:
     client = make_client()
-    project_id = client.post("/api/projects", json={"name": "Demo"}).json()["projectId"]
+    project_id = client.post("/api/osint/projects", json={"name": "Demo"}).json()["projectId"]
     for url in ("ftp://example.com", "https://user:pass@example.com", "https://localhost", "https://127.0.0.1"):
-        assert client.post(f"/api/projects/{project_id}/sources", json={"username": "demo-user", "url": url}).status_code == 422
+        assert client.post(f"/api/osint/projects/{project_id}/sources", json={"username": "demo-user", "url": url}).status_code == 422
 
     created = client.post(
-        f"/api/projects/{project_id}/sources",
+        f"/api/osint/projects/{project_id}/sources",
         json={"username": "demo-user", "url": "https://example.com"},
     )
     assert created.status_code == 201
     assert client.post(
-        f"/api/projects/{project_id}/sources",
+        f"/api/osint/projects/{project_id}/sources",
         json={"username": "demo-user", "url": "https://example.com/"},
     ).status_code == 409
-    listed = client.get(f"/api/projects/{project_id}/sources", params={"username": "demo-user"})
+    listed = client.get(f"/api/osint/projects/{project_id}/sources", params={"username": "demo-user"})
     assert len(listed.json()["sources"]) == 1
-    assert client.delete(f"/api/projects/{project_id}/sources/{created.json()['sourceId']}").status_code == 204
-    assert client.get(f"/api/projects/{project_id}/sources", params={"username": "demo-user"}).json()["sources"] == []
+    assert client.delete(f"/api/osint/projects/{project_id}/sources/{created.json()['sourceId']}").status_code == 204
+    assert client.get(f"/api/osint/projects/{project_id}/sources", params={"username": "demo-user"}).json()["sources"] == []
 
 
 def test_unknown_project_is_not_accepted_for_sources_or_discovery() -> None:
     client = make_client()
     assert client.post(
-        "/api/projects/missing/sources", json={"username": "demo-user", "url": "https://example.com"}
+        "/api/osint/projects/missing/sources", json={"username": "demo-user", "url": "https://example.com"}
     ).status_code == 404
     assert client.post(
         "/api/discovery", json={"query": "demo-user", "queryType": "username", "projectId": "missing"}

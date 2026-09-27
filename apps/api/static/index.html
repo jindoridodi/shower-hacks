@@ -178,7 +178,7 @@
       }
 
       async function loadProjects(selectedId = activeProjectId() || localStorage.getItem(PROJECT_STORAGE_KEY)) {
-        const response = await fetch('/api/projects');
+        const response = await fetch('/api/osint/projects');
         if (!response.ok) throw new Error('Unable to load projects.');
         const projects = await response.json();
         projectSelect.innerHTML = '<option value="">Choose a project to save links</option>' + projects
@@ -299,7 +299,7 @@
         if (!name) { projectStatus.textContent = 'Enter a project name.'; return; }
         createProject.disabled = true;
         try {
-          const response = await fetch('/api/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
+          const response = await fetch('/api/osint/projects', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) });
           const project = await response.json();
           if (!response.ok) throw new Error(project.detail || 'Project creation failed.');
           projectName.value = '';
@@ -327,7 +327,7 @@
         button.disabled = true;
         manualSourceStatus.textContent = 'Saving public link…';
         try {
-          const response = await fetch(`/api/projects/${encodeURIComponent(activeProjectId())}/sources`, {
+          const response = await fetch(`/api/osint/projects/${encodeURIComponent(activeProjectId())}/sources`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ username: latestDiscovery.query, url: manualSourceUrl.value.trim() }),
           });
@@ -346,7 +346,7 @@
       async function removeSavedSource(sourceId) {
         if (!activeProjectId() || !sourceId) return;
         try {
-          const response = await fetch(`/api/projects/${encodeURIComponent(activeProjectId())}/sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' });
+          const response = await fetch(`/api/osint/projects/${encodeURIComponent(activeProjectId())}/sources/${encodeURIComponent(sourceId)}`, { method: 'DELETE' });
           if (!response.ok) { const data = await response.json(); throw new Error(data.detail || 'Unable to remove saved link.'); }
           form.requestSubmit();
         } catch (error) {

@@ -15,7 +15,7 @@ from apps.api.services.documents import stage_chunks, stage_document
 from apps.api.services.chunker import chunk_text
 from apps.api.services.processing import prepare_document
 from apps.api.services.firecrawl import PublicPageScraper, ScrapedPage, get_public_page_scraper
-from apps.api.services.sources import get_source
+from apps.api.services.sources import get_source, require_crawlable_source
 from apps.api.services.hashing import sha256_text
 from apps.api.services.urls import InvalidURL, canonicalize_url
 
@@ -26,7 +26,7 @@ _TRANSITIONS: dict[str, set[str]] = {
 
 
 def queue_crawl(db: Session, source_id: str) -> CrawlJob:
-    source = get_source(db, source_id)
+    source = require_crawlable_source(db, source_id)
     now = utc_now()
     job = CrawlJob(
         id=str(uuid4()),
@@ -153,7 +153,7 @@ def ingest_scraped_page(db: Session, crawl_id: str, page: ScrapedPage) -> Docume
             "invalid_status_transition",
             f"Cannot ingest a page for a {job.status} crawl",
         )
-    source = get_source(db, job.source_id)
+    source = require_crawlable_source(db, job.source_id)
     try:
         canonical = canonicalize_url(page.url)
     except InvalidURL as exc:
@@ -227,13 +227,66 @@ def run_queued_crawl(
     job = get_crawl(db, crawl_id)
     if job.status != "queued":
         raise APIError(409, "invalid_status_transition", "Only queued crawls can be run")
-    source = get_source(db, job.source_id)
+    source = require_crawlable_source(db, job.source_id)
     update_crawl_status(db, crawl_id, "running", None)
     try:
         page = (scraper or get_public_page_scraper()).scrape_public_url(source.url)
         return ingest_scraped_page(db, crawl_id, page)
     except Exception:
         update_crawl_status(db, crawl_id, "failed", "Crawl processing failed")
+        raise
+
+
+def claim_next_queued_crawl(db: Session) -> CrawlJob | None:
+    """Claim one queued, approved job for a single worker iteration.
+
+    SQLite serializes writes; keeping selection and the state transition in one
+    transaction prevents two local workers from both claiming the same row.
+    """
+
+    with transaction(db):
+        job = db.scalar(
+            select(CrawlJob)
+            .join(Source, Source.id == CrawlJob.source_id)
+            .where(
+                CrawlJob.status == "queued",
+                Source.approval_status == "approved",
+                Source.is_allowlisted.is_(True),
+            )
+            .order_by(CrawlJob.created_at, CrawlJob.id)
+            .limit(1)
+        )
+        if job is None:
+            return None
+        source = db.get(Source, job.source_id)
+        if source is None:  # pragma: no cover - constrained by the foreign key
+            return None
+        now = utc_now()
+        job.status = "running"
+        job.started_at = now
+        job.updated_at = now
+        source.status = "running"
+        source.updated_at = now
+    db.refresh(job)
+    return job
+
+
+def run_claimed_crawl(
+    db: Session,
+    crawl_id: str,
+    scraper: PublicPageScraper | None = None,
+) -> Document:
+    """Run a job already claimed by ``claim_next_queued_crawl``."""
+
+    job = get_crawl(db, crawl_id)
+    if job.status != "running":
+        raise APIError(409, "invalid_status_transition", "Only running crawls can be completed by a worker")
+    source = require_crawlable_source(db, job.source_id)
+    try:
+        page = (scraper or get_public_page_scraper()).scrape_public_url(source.url)
+        return ingest_scraped_page(db, crawl_id, page)
+    except Exception as error:
+        update_crawl_status(db, crawl_id, "failed", str(error))
         raise
 
 

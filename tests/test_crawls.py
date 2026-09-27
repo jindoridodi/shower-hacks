@@ -2,12 +2,19 @@ import threading
 
 from apps.api.errors import APIError
 from apps.api.services.crawls import queue_crawl
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 
 def test_crawl_job_tracks_status_timestamps_and_errors(client):
     project = create_project(client)
     source = create_source(client, project["id"])
+
+    unapproved = client.post("/crawls", json={"source_id": source["id"]})
+    assert unapproved.status_code == 409
+    assert unapproved.json()["detail"]["code"] == "source_not_approved"
+    approved = approve_source(client, source["id"])
+    assert approved["approval_status"] == "approved"
+    assert approved["is_allowlisted"] is True
 
     created = client.post("/crawls", json={"source_id": source["id"]})
     assert created.status_code == 201
@@ -71,6 +78,7 @@ def test_crawl_job_tracks_status_timestamps_and_errors(client):
 def test_queue_endpoint_creates_a_crawl(client):
     project = create_project(client)
     source = create_source(client, project["id"], "https://example.com/queue")
+    approve_source(client, source["id"])
     queued = client.post(f"/sources/{source['id']}/queue")
     assert queued.status_code == 201
     assert queued.json()["status"] == "queued"
@@ -86,6 +94,7 @@ def test_crawl_for_missing_source_returns_404(client):
 def test_concurrent_queue_keeps_one_active_crawl(app, client):
     project = create_project(client)
     source = create_source(client, project["id"], "https://example.com/concurrent")
+    approve_source(client, source["id"])
     barrier = threading.Barrier(6)
     jobs: list[str] = []
     codes: list[str] = []
@@ -125,6 +134,7 @@ def test_concurrent_queue_keeps_one_active_crawl(app, client):
 def test_succeeded_crawl_rejects_an_error_message(client):
     project = create_project(client)
     source = create_source(client, project["id"], "https://example.com/ok")
+    approve_source(client, source["id"])
     job = client.post("/crawls", json={"source_id": source["id"]}).json()
     client.patch(f"/crawls/{job['id']}", json={"status": "running"})
     response = client.patch(

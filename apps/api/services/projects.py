@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 
 from apps.api.clock import utc_now
 from apps.api.db import transaction
@@ -30,3 +31,7 @@ def get_project(db: Session, project_id: str) -> Project:
     if project is None:
         raise APIError(404, "project_not_found", "Project not found")
     return project
+
+
+def list_projects(db: Session) -> list[Project]:
+    return list(db.scalars(select(Project).order_by(Project.created_at, Project.id)).all())
