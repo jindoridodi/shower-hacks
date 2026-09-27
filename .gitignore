@@ -231,3 +231,7 @@ data/*.db
 data/*.db-wal
 data/*.db-shm
 data/*.db-journal
+
+!data/
+!data/fixtures/
+!data/fixtures/*.json

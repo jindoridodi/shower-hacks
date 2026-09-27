@@ -47,6 +47,8 @@ def test_approval_creates_a_canonical_source_with_provenance():
     sources = client.get("/sources", params={"project_id": project["id"]})
     assert sources.status_code == 200
     assert [source["id"] for source in sources.json()] == [body["sourceId"]]
+    assert sources.json()[0]["approval_status"] == "approved"
+    assert sources.json()[0]["is_allowlisted"] is True
 
     crawls = client.get("/crawls", params={"source_id": body["sourceId"]})
     assert crawls.status_code == 200

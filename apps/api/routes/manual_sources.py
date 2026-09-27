@@ -17,7 +17,7 @@ from apps.api.services.manual_sources.repository import (
     SQLiteSourceRepository,
 )
 
-router = APIRouter(prefix="/api/projects", tags=["osint-projects", "manual-sources"])
+router = APIRouter(prefix="/api/osint/projects", tags=["osint-projects", "manual-sources"])
 
 
 def _repository(request: Request) -> SQLiteSourceRepository:

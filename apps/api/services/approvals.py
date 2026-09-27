@@ -45,6 +45,10 @@ def approve_candidate(db: Session, payload: CandidateApprovalCreate) -> Candidat
         url=approved_url,
         canonical_url=canonical_url,
         status="pending",
+        approval_status="approved",
+        is_allowlisted=True,
+        approved_at=now,
+        approval_origin="discovery",
         created_at=now,
         updated_at=now,
     )

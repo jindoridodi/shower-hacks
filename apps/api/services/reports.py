@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
+from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import func, select
@@ -13,11 +15,17 @@ from apps.api.schemas.report import ClaimSourceCreate
 from apps.api.services.projects import get_project
 
 
-def create_report(db: Session, project_id: str, title: str) -> Report:
+def create_report(
+    db: Session,
+    project_id: str,
+    title: str,
+    *,
+    report_id: str | None = None,
+) -> Report:
     get_project(db, project_id)
     now = utc_now()
     report = Report(
-        id=str(uuid4()),
+        id=report_id or str(uuid4()),
         project_id=project_id,
         title=title,
         created_at=now,
@@ -25,6 +33,73 @@ def create_report(db: Session, project_id: str, title: str) -> Report:
     )
     with transaction(db):
         db.add(report)
+    return _load_report(db, report.id)
+
+
+def persist_generated_report(
+    db: Session,
+    *,
+    project_id: str,
+    generated_report: Mapping[str, Any],
+    evidence_excerpts: Sequence[Mapping[str, Any]],
+) -> Report:
+    """Persist validated generated claims with their stored evidence excerpts."""
+    report_id = generated_report.get("id")
+    title = generated_report.get("title")
+    if not isinstance(report_id, str) or not isinstance(title, str):
+        raise APIError(422, "invalid_generated_report", "Generated report metadata is invalid")
+
+    excerpts_by_source: dict[str, list[str]] = {}
+    for excerpt in evidence_excerpts:
+        source_id = excerpt.get("sourceId")
+        text = excerpt.get("text")
+        if not isinstance(source_id, str) or not isinstance(text, str):
+            continue
+        excerpts_by_source.setdefault(source_id, []).append(text)
+    prepared_claims: list[tuple[str, list[ClaimSourceCreate]]] = []
+    for claim in generated_report.get("claims", []):
+        if not isinstance(claim, Mapping):
+            raise APIError(422, "invalid_generated_report", "Generated claims must be objects")
+        claim_text = claim.get("text")
+        source_ids = claim.get("sourceIds")
+        if not isinstance(claim_text, str) or not isinstance(source_ids, list):
+            raise APIError(422, "invalid_generated_report", "Generated claim data is invalid")
+        if not all(isinstance(source_id, str) and source_id in excerpts_by_source for source_id in source_ids):
+            raise APIError(422, "invalid_generated_report", "Generated claim cited unavailable evidence")
+        links = [
+            ClaimSourceCreate(source_id=source_id, excerpt=excerpt)
+            for source_id in source_ids
+            for excerpt in dict.fromkeys(excerpts_by_source[source_id])
+        ]
+        prepared_claims.append((claim_text, links))
+
+    now = utc_now()
+    report = Report(
+        id=report_id,
+        project_id=project_id,
+        title=title,
+        created_at=now,
+        updated_at=now,
+    )
+    resolved_claims: list[tuple[str, list[tuple[Source, str]]]] = []
+    for claim_text, links in prepared_claims:
+        resolved_claims.append(
+            (claim_text, [_resolve_source(db, report, link) for link in links])
+        )
+
+    with transaction(db):
+        db.add(report)
+        for position, (claim_text, resolved_links) in enumerate(resolved_claims):
+            claim = ReportClaim(
+                id=str(uuid4()),
+                report_id=report.id,
+                claim_text=claim_text,
+                position=position,
+                created_at=now,
+            )
+            db.add(claim)
+            for source, excerpt in resolved_links:
+                _add_link(db, claim, source, excerpt, now)
     return _load_report(db, report.id)
 
 
@@ -207,4 +282,3 @@ def _load_claim(db: Session, claim_id: str) -> ReportClaim:
     if claim is None:
         raise APIError(404, "claim_not_found", "Claim not found")
     return claim
-

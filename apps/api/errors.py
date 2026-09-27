@@ -10,6 +10,7 @@ class APIError(Exception):
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
+        self.code = code
         self.payload = {"code": code, "message": message, **extra}
 
 

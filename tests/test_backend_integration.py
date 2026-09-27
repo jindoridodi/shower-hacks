@@ -8,7 +8,7 @@ from apps.api.config import repo_root
 from apps.api.services.crawls import ingest_scraped_page
 from apps.api.services.firecrawl import ScrapedPage
 from apps.api.services.hashing import sha256_text
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 _FIXTURE = json.loads((repo_root() / "data" / "fixtures" / "report.json").read_text(encoding="utf-8"))
 _PAGE = _FIXTURE["claims"][0]["text"]
@@ -22,6 +22,7 @@ def test_public_page_flow_persists_a_cited_report(client, session):
     assert source["url"] == "HTTPS://Example.COM/archives/"
     assert source["canonical_url"] == "https://example.com/archives"
     assert source["status"] == "pending"
+    approve_source(client, source["id"])
 
     rejected = client.patch("/api/crawls/missing", json={"status": "complete"})
     assert rejected.status_code == 422

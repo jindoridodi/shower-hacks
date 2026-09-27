@@ -48,6 +48,28 @@ class ReportGeneratorTests(unittest.TestCase):
         self.assertEqual(report["claims"], [])
         self.assertEqual(report["unknowns"], ["The corpus does not contain safe evidence for this report."])
 
+    def test_fixture_mode_uses_runtime_source_ids_for_non_seed_projects(self) -> None:
+        evidence = [
+            {
+                "sourceId": "database-source-id",
+                "sourceTitle": "Project source",
+                "sourceUrl": "https://example.com/project-source",
+                "text": "A public project source describes archive research.",
+                "sensitivityStatus": "safe",
+            }
+        ]
+
+        report = generate_report(
+            report_id="report-runtime-fixture",
+            generated_at="2026-09-26T20:00:00Z",
+            mode="factual_profile",
+            evidence_excerpts=evidence,
+            use_fixtures=True,
+        )
+
+        self.assertEqual(report["claims"][0]["sourceIds"], ["database-source-id"])
+        self.assertEqual(report["claims"][0]["text"], evidence[0]["text"])
+
     def test_renders_the_requested_prompt_and_validates_model_output(self) -> None:
         model = FakeReportModel(
             {

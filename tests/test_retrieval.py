@@ -6,7 +6,7 @@ from apps.api.services.crawls import ingest_scraped_page
 from apps.api.services.documents import search_chunks as backend_search
 from apps.api.services.firecrawl import ScrapedPage
 from apps.api.services.retrieval import search_chunks
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 
 def test_real_fts5_search_scoping_limits_and_filtered_evidence(client, session):
@@ -14,6 +14,7 @@ def test_real_fts5_search_scoping_limits_and_filtered_evidence(client, session):
     for index in range(2):
         project = create_project(client, name=f'Project {index}')
         source = create_source(client, project['id'], f'https://example.com/{index}')
+        approve_source(client, source['id'])
         job = client.post('/crawls', json={'source_id': source['id']}).json()
         document = ingest_scraped_page(session, job['id'], ScrapedPage(
             url=source['url'], markdown='Hiking robots.\n\nBuilds creative projects.\n\nhidden@example.test',

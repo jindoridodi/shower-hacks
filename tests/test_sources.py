@@ -49,6 +49,8 @@ def test_project_and_source_creation(client):
     assert source["url"] == "HTTPS://Example.COM/docs/#section"
     assert source["canonical_url"] == "https://example.com/docs"
     assert source["status"] == "pending"
+    assert source["approval_status"] == "pending"
+    assert source["is_allowlisted"] is False
     assert source["content_hash"] is None
     assert source["scraped_at"] is None
 
@@ -104,9 +106,24 @@ def test_invalid_url_and_missing_project_are_clear_errors(client):
     assert malformed.status_code == 422
     assert malformed.json()["detail"]["code"] == "invalid_url"
 
+    private_target = client.post(
+        "/sources",
+        json={"project_id": project["id"], "url": "https://127.0.0.1/private"},
+    )
+    assert private_target.status_code == 422
+    assert private_target.json()["detail"]["code"] == "invalid_url"
+
     missing = client.post(
         "/sources",
         json={"project_id": "missing-project", "url": "https://example.com/"},
     )
     assert missing.status_code == 404
     assert missing.json()["detail"]["code"] == "project_not_found"
+
+
+def test_source_can_be_removed_before_it_is_cited(client):
+    project = create_project(client)
+    source = create_source(client, project["id"])
+    deleted = client.delete(f"/sources/{source['id']}")
+    assert deleted.status_code == 204
+    assert client.get(f"/sources/{source['id']}").status_code == 404

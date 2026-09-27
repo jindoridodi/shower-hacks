@@ -68,9 +68,16 @@ def create_app(
         return {"status": "ok"}
 
     @app.get("/api/health", tags=["health"])
-    def api_health() -> dict[str, object]:
+    def api_health(db: Session = Depends(get_db)) -> dict[str, object]:
         settings = get_settings()
-        return {"status": "ok", "llmConfigured": settings.llm_configured}
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "database": "ok",
+            "llmConfigured": settings.llm_configured,
+            "firecrawlConfigured": bool(settings.firecrawl_api_key),
+            "crawlWorkerCommand": "python -m workers.crawl_worker --once",
+        }
 
     static_directory = Path(__file__).resolve().parent / "static"
     if static_directory.exists():
