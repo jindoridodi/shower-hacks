@@ -44,6 +44,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
         "003_document_processing",
         "003_source_approvals",
         "004_embeddings",
+        "004_source_allowlist",
     ]
     assert second == []
 
@@ -74,6 +75,7 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
         "003_document_processing",
         "003_source_approvals",
         "004_embeddings",
+        "004_source_allowlist",
     ]
     assert "uq_report_claims_report_position" in indexes
     assert "uq_crawl_jobs_one_active" in indexes
@@ -174,6 +176,7 @@ def test_processing_migration_preserves_existing_documents(tmp_path):
         "003_document_processing",
         "003_source_approvals",
         "004_embeddings",
+        "004_source_allowlist",
     ]
     assert apply_migrations(database_path) == []
     with sqlite3.connect(database_path) as connection:

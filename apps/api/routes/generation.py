@@ -5,16 +5,20 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
 
 from apps.api.config import get_settings
+from apps.api.dependencies import get_db
 from apps.api.services.communication_draft_generator import (
     CommunicationDraftError,
     generate_communication_draft,
 )
 from apps.api.services.openai_compatible_text_model import OpenAICompatibleTextModel
 from apps.api.services.report_generator import ReportGenerationError, generate_report
+from apps.api.services.evidence import list_safe_excerpts
+from apps.api.services.reports import persist_generated_report
 from apps.api.services.text_model import TextModelError
 
 router = APIRouter(tags=["generation"])
@@ -24,13 +28,11 @@ class ReportRequest(BaseModel):
     reportId: str
     generatedAt: str | None = None
     mode: Literal["factual_profile", "uncertainty_report"] = "factual_profile"
-    evidenceExcerpts: list[dict[str, Any]] = Field(default_factory=list)
     useFixtures: bool = False
 
 
 class DraftRequest(BaseModel):
     recipient: str
-    evidenceExcerpts: list[dict[str, Any]] = Field(default_factory=list)
     useFixtures: bool = False
 
 
@@ -66,20 +68,31 @@ def llm_ping() -> PingResponse:
 
 
 @router.post("/api/projects/{project_id}/reports")
-def create_generated_report(project_id: str, request: ReportRequest) -> dict[str, Any]:
-    del project_id
+def create_generated_report(
+    project_id: str,
+    request: ReportRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
     model = None
     try:
+        evidence_excerpts = [excerpt.as_dict() for excerpt in list_safe_excerpts(db, project_id)]
         if not request.useFixtures:
             model = _model()
-        return generate_report(
+        generated = generate_report(
             report_id=request.reportId,
             generated_at=_generated_at(request.generatedAt),
             mode=request.mode,
-            evidence_excerpts=request.evidenceExcerpts,
+            evidence_excerpts=evidence_excerpts,
             model=model,
             use_fixtures=request.useFixtures,
         )
+        persist_generated_report(
+            db,
+            project_id=project_id,
+            generated_report=generated,
+            evidence_excerpts=evidence_excerpts,
+        )
+        return generated
     except (ReportGenerationError, TextModelError, ValueError) as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     finally:
@@ -88,15 +101,19 @@ def create_generated_report(project_id: str, request: ReportRequest) -> dict[str
 
 
 @router.post("/api/projects/{project_id}/drafts")
-def create_draft(project_id: str, request: DraftRequest) -> dict[str, Any]:
-    del project_id
+def create_draft(
+    project_id: str,
+    request: DraftRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
     model = None
     try:
+        evidence_excerpts = [excerpt.as_dict() for excerpt in list_safe_excerpts(db, project_id)]
         if not request.useFixtures:
             model = _model()
         return generate_communication_draft(
             recipient=request.recipient,
-            evidence_excerpts=request.evidenceExcerpts,
+            evidence_excerpts=evidence_excerpts,
             model=model,
             use_fixtures=request.useFixtures,
         )

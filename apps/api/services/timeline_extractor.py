@@ -64,10 +64,13 @@ def _extract_from_text(source_id: str, text: str) -> list[tuple[str, dict[str, A
 
 
 def _normalized_date(date_text: str, match_type: str) -> str | None:
-    if match_type == "month":
-        return datetime.strptime(date_text, "%B %d, %Y").date().isoformat()
-    if match_type == "iso":
-        return date.fromisoformat(date_text).isoformat()
+    try:
+        if match_type == "month":
+            return datetime.strptime(date_text, "%B %d, %Y").date().isoformat()
+        if match_type == "iso":
+            return date.fromisoformat(date_text).isoformat()
+    except ValueError:
+        return None
     return None
 
 

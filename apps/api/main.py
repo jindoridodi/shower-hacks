@@ -19,7 +19,6 @@ from apps.api.dependencies import get_db
 from apps.api.errors import APIError
 from apps.api.routes import crawls, documents, generation, instagram, integration, projects, reports, sources
 from apps.api.routes.discovery import router as discovery_router
-from apps.api.routes.enrichment import router as enrichment_router
 from apps.api.routes.graph import router as graph_router
 from apps.api.routes.manual_sources import router as manual_sources_router
 from apps.api.services.discovery.service import DiscoveryService, build_default_service
@@ -80,7 +79,6 @@ def create_app(
     app.include_router(generation.router)
     app.include_router(discovery_router)
     app.include_router(graph_router)
-    app.include_router(enrichment_router)
     app.include_router(manual_sources_router)
     _register_handlers(app)
 
@@ -90,9 +88,16 @@ def create_app(
         return {"status": "ok"}
 
     @app.get("/api/health", tags=["health"])
-    def api_health() -> dict[str, object]:
+    def api_health(db: Session = Depends(get_db)) -> dict[str, object]:
         settings = get_settings()
-        return {"status": "ok", "llmConfigured": settings.llm_configured}
+        db.execute(text("SELECT 1"))
+        return {
+            "status": "ok",
+            "database": "ok",
+            "llmConfigured": settings.llm_configured,
+            "firecrawlConfigured": bool(settings.firecrawl_api_key),
+            "crawlWorkerCommand": "python -m workers.crawl_worker --once",
+        }
 
     static_directory = Path(__file__).resolve().parent / "static"
     if static_directory.exists():

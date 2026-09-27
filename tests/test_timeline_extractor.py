@@ -74,6 +74,21 @@ class TimelineExtractorTests(unittest.TestCase):
     def test_returns_no_items_for_empty_evidence(self) -> None:
         self.assertEqual(extract_timeline_items([]), [])
 
+    def test_keeps_invalid_calendar_dates_without_crashing(self) -> None:
+        items = extract_timeline_items(
+            [{
+                "sourceId": "src_invalid_date",
+                "text": "The archive lists February 30, 2020 and 2020-13-40.",
+                "sensitivityStatus": "safe",
+            }]
+        )
+
+        self.assertEqual(
+            [item["dateText"] for item in items],
+            ["February 30, 2020", "2020-13-40"],
+        )
+        self.assertTrue(all("normalizedDate" not in item for item in items))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2,7 +2,9 @@
 
 ## API endpoints
 
-This process serves three documented surfaces. Paths are not interchangeable: OSINT projects live in a separate SQLite file from the corpus ledger.
+This process serves three documented surfaces. The corpus ledger is the source
+of truth for projects, sources, crawls, and reports. The legacy OSINT
+saved-source store is separate and does not grant crawl permission.
 
 ### Corpus ledger
 
@@ -37,25 +39,31 @@ GET  /api/reports/{report_id}
 GET  /health
 ```
 
-The `/api/projects/{project_id}/crawls`, `/api/crawls/{crawl_id}`, `/api/projects/{project_id}/corpus`, and `/api/reports/{report_id}` routes are aliases over the same corpus records as the unprefixed routes. `POST /api/projects/{project_id}/reports/persisted` writes a generated report into `reports`, `report_claims`, and `claim_sources`.
-
-`POST /api/projects` and `POST /api/projects/{project_id}/sources` are not corpus aliases. Those paths belong to the OSINT surface below.
+The `/api/projects/{project_id}/crawls`, `/api/crawls/{crawl_id}`,
+`/api/projects/{project_id}/corpus`, and `/api/reports/{report_id}` routes are
+aliases over the same corpus records as the unprefixed routes.
+`POST /api/projects/{project_id}/reports/persisted` writes a generated report
+into `reports`, `report_claims`, and `claim_sources`.
 
 ### OSINT manual sources
 
 Database: `OSINT_DATABASE_URL`, default `sqlite:///./data/osint_sources.db`.
+These endpoints are a discovery-only compatibility surface; they cannot create
+or queue corpus sources.
 
 ```text
-POST /api/projects
-GET  /api/projects
+POST /api/osint/projects
+GET  /api/osint/projects
 POST /instagram/profiles
 POST /api/discovery
+POST /api/approvals
+GET  /api/approvals?projectId={project_id}
 POST /api/graph/export?format=csv|gexf
 POST /api/enrichment/spiderfoot
 GET  /api/enrichment/spiderfoot/{job_id}
-POST /api/projects/{project_id}/sources
-GET  /api/projects/{project_id}/sources?username={username}
-DELETE /api/projects/{project_id}/sources/{source_id}
+POST /api/osint/projects/{project_id}/sources
+GET  /api/osint/projects/{project_id}/sources?username={username}
+DELETE /api/osint/projects/{project_id}/sources/{source_id}
 GET  /api/health
 ```
 
@@ -109,6 +117,11 @@ Sensitivity values `sensitive`, `restricted`, and `redacted` are rejected. A cit
 
 `POST /instagram/profiles` reads one public Instagram username through Apify. It is not part of the corpus crawl flow.
 
+The unprefixed ledger endpoints (`/projects`, `/sources`, and `/crawls`) remain
+available for compatibility. The OSINT prototype's separate saved-source store
+is available only at `/api/osint/projects/...`; it is not a crawl allowlist and
+cannot queue a crawl.
+
 ## Discovery response
 
 `POST /api/discovery` returns candidate public URLs only. It never crawls or generates reports. The endpoint infers a direct URL from an `http://` or `https://` query; every other query is handled as a username. `queryType` remains accepted for backward compatibility. When the optional `projectId` is provided for a username query, it also merges locally saved user-supplied sources for that exact project and normalized username.
@@ -127,9 +140,29 @@ Sensitivity values `sensitive`, `restricted`, and `redacted` are rejected. A cit
 
 Username discovery always runs Sherlock, Maigret, and WhatsMyName. Empty candidates are a successful result; provider failures use `partial` and `warnings`. Saved sources carry `user_supplied` evidence and high confidence because they were deliberately attached, not because they prove identity.
 
-`POST /api/projects/{project_id}/sources` accepts `{ "username": "demo-user", "url": "https://example.com/profile" }`. URLs must be direct public HTTP(S) URLs; saving does not fetch, crawl, or enrich them.
+`POST /api/projects/{project_id}/sources` accepts
+`{ "url": "https://example.com/profile" }`. URLs must be direct public HTTP(S)
+targets: credentialed, loopback, and private IP targets are rejected. Creating a
+source does not fetch, crawl, or enrich it. It starts with
+`approval_status: "pending"` and `is_allowlisted: false`.
 
-`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download. SpiderFoot enrichment only accepts an explicitly selected public URL, username, or domain and never starts a crawl.
+`PATCH /api/projects/{project_id}/sources/{source_id}/approval` accepts
+`{ "approval_status": "approved" | "rejected" }`. Only an approved,
+allowlisted source may be queued. `POST /api/approvals` is the discovery
+candidate path: it stores candidate provenance and creates an already-approved,
+allowlisted source, but never queues it.
+
+Run one worker iteration with:
+
+```bash
+python -m workers.crawl_worker --once
+```
+
+The worker only claims approved, allowlisted queued jobs. It records a terminal
+failure when Firecrawl is unavailable or retrieval fails, without logging
+credentials or crawled content.
+
+`POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download.
 
 ## Instagram profile response
 

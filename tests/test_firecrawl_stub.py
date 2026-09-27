@@ -10,7 +10,7 @@ from apps.api.services.firecrawl import (
     ScrapedPage,
     get_public_page_scraper,
 )
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 
 def test_scraper_stub_does_not_fetch():
@@ -65,6 +65,7 @@ def test_firecrawl_scraper_returns_the_shared_scraped_page_contract():
 def test_ingest_scraped_page_stores_a_document_and_completes_the_job(client, session):
     project = create_project(client)
     source = create_source(client, project["id"], "https://example.com/about")
+    approve_source(client, source["id"])
     crawl = client.post("/crawls", json={"source_id": source["id"]})
     assert crawl.status_code == 201
 
@@ -76,9 +77,13 @@ def test_ingest_scraped_page_stores_a_document_and_completes_the_job(client, ses
     stored = client.get(f"/documents/{document.id}")
     assert stored.status_code == 200
     assert stored.json()["cleaned_text"] == "Public bio text"
+    assert stored.json()["raw_text"] == "Public bio text"
     assert stored.json()["sensitivity_status"] == "clear"
     assert stored.json()["title"] == "About"
     assert stored.json()["content_type"] == "text/markdown"
+    chunks = client.get(f"/documents/{document.id}/chunks")
+    assert chunks.status_code == 200
+    assert [chunk["text"] for chunk in chunks.json()] == ["Public bio text"]
 
     refreshed = client.get(f"/crawls/{crawl.json()['id']}").json()
     assert refreshed["status"] == "succeeded"
@@ -92,6 +97,7 @@ def test_ingest_scraped_page_stores_a_document_and_completes_the_job(client, ses
 def test_ingest_rejects_a_different_url_without_changing_the_job(client, session):
     project = create_project(client)
     source = create_source(client, project["id"], "https://example.com/about")
+    approve_source(client, source["id"])
     crawl = client.post("/crawls", json={"source_id": source["id"]})
     with pytest.raises(APIError) as caught:
         ingest_scraped_page(
@@ -103,3 +109,17 @@ def test_ingest_rejects_a_different_url_without_changing_the_job(client, session
     assert caught.value.payload["code"] == "url_mismatch"
     assert client.get(f"/crawls/{crawl.json()['id']}").json()["status"] == "queued"
     assert client.get(f"/sources/{source['id']}").json()["status"] == "queued"
+
+
+def test_ingest_rejects_a_page_when_filtering_removes_all_content(client, session):
+    project = create_project(client)
+    source = create_source(client, project["id"], "https://example.com/about")
+    approve_source(client, source["id"])
+    crawl = client.post("/crawls", json={"source_id": source["id"]})
+
+    assert ingest_scraped_page(
+        session,
+        crawl.json()["id"],
+        ScrapedPage(url="https://example.com/about", markdown="Contact alex@example.test"),
+    ) is None
+    assert client.get(f"/crawls/{crawl.json()['id']}").json()["status"] == "failed"

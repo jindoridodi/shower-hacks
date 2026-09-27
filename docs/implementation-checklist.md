@@ -125,11 +125,8 @@ Own public username discovery, Instagram profile extraction, provider behavior, 
 - [ ] Save approved URLs to a project and track approval separately from confidence.
 - [ ] Ensure rejected candidates cannot be crawled.
 - [ ] Ensure only approved URLs enter the crawl allowlist.
-- [ ] Prevent discovery or enrichment from automatically crawling candidates.
+- [ ] Prevent discovery from automatically crawling candidates.
 - [ ] Verify Gephi CSV ZIP and GEXF exports.
-- [ ] Keep SpiderFoot disabled unless explicitly configured.
-- [ ] Enforce SpiderFoot module, local-sidecar, and result-count restrictions.
-- [ ] Require explicit selection before enrichment results become sources.
 - [ ] Document that OSINT discovery is not identity proof.
 - [ ] Run one known-good live username query per provider.
 - [ ] Test duplicate results, provider failure, target rejection, timeouts, and fixture/live shape equivalence.

@@ -8,12 +8,13 @@ from apps.api.services import crawls
 from apps.api.services.documents import list_chunks
 from apps.api.services.firecrawl import ScrapedPage
 from apps.api.services.retrieval import search_chunks
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 
 def queued_page(client):
     project = create_project(client)
     source = create_source(client, project['id'], 'https://example.com/about')
+    approve_source(client, source['id'])
     job = client.post('/crawls', json={'source_id': source['id']}).json()
     return source, job
 
