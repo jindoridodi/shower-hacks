@@ -12,7 +12,7 @@ from apps.api.errors import APIError
 from apps.api.main import create_app
 from apps.api.models import ChunkEmbedding, DocumentChunk
 from apps.api.services.embeddings import prepare_embeddings, stage_embeddings, unit_vector
-from tests.helpers import create_project, create_source
+from tests.helpers import approve_source, create_project, create_source
 
 
 class FakeEmbedder:
@@ -190,7 +190,10 @@ def test_ingest_embeds_filtered_text_only(tmp_path):
     with running(tmp_path, provider=provider) as (app, client):
         project = create_project(client)
         source = create_source(client, project['id'])
-        job = client.post('/crawls', json={'source_id': source['id']}).json()
+        approve_source(client, source['id'])
+        response = client.post('/crawls', json={'source_id': source['id']})
+        assert response.status_code == 201, response.text
+        job = response.json()
         with app.state.session_factory() as db:
             document = ingest_scraped_page(db, job['id'], ScrapedPage(
                 url=source['url'], markdown='Enjoys hiking.\n\nContact alex@example.test',
