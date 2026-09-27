@@ -5,6 +5,7 @@
 ```text
 POST /api/projects
 GET  /api/projects
+POST /instagram/profiles
 POST /api/discovery
 POST /api/graph/export?format=csv|gexf
 POST /api/enrichment/spiderfoot
@@ -68,3 +69,28 @@ Username discovery always runs Sherlock, Maigret, and WhatsMyName. Empty candida
 `POST /api/projects/{project_id}/sources` accepts `{ "username": "demo-user", "url": "https://example.com/profile" }`. URLs must be direct public HTTP(S) URLs; saving does not fetch, crawl, or enrich them.
 
 `POST /api/graph/export` accepts the discovery `query`, `candidates`, and `providerEvidence`, then returns a CSV ZIP or GEXF download. SpiderFoot enrichment only accepts an explicitly selected public URL, username, or domain and never starts a crawl.
+
+## Instagram profile response
+
+`POST /instagram/profiles` accepts one public Instagram username:
+
+```json
+{ "username": "example.user" }
+```
+
+It returns normalized profile fields: `username`, `full_name`, `biography`, `profile_url`, `profile_picture_url`, `external_url`, `category`, profile counts, `is_verified`, `is_private`, and up to ten caption-bearing `recent_posts`. URLs remain strings; the endpoint does not download media, create sources, or queue crawls.
+
+For private profiles, only the username, canonical profile URL, private/verified flags, and available counts are returned. Name, biography, image, external URL, category, and posts are redacted to `null` or `[]`.
+
+Errors use the normal API `detail` envelope with `code`, `message`, and `retryable`:
+
+| Status | Code | Retryable |
+| --- | --- | --- |
+| 503 | `apify_not_configured` | no |
+| 503 | `apify_auth_failed` | no |
+| 404 | `instagram_profile_not_found` | no |
+| 503 | `instagram_provider_unavailable` | yes |
+| 502 | `instagram_invalid_response` | no |
+| 502 | `instagram_provider_rejected` | no |
+
+Set `INSTAGRAM_USE_FIXTURES=true` to use `demo.public`, `demo.private`, `demo.missing`, and `demo.unavailable` from `data/fixtures/instagram-profiles.json`. Fixture mode is explicit and never replaces a failed live lookup.

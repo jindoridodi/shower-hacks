@@ -1,3 +1,4 @@
+certifi
 fastapi
 httpx
 python-dotenv

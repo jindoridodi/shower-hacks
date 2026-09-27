@@ -9,6 +9,7 @@ description = "Source, crawl, discovery, document, and evidence API for Borrowed
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "certifi>=2024.0.0",
     "fastapi>=0.115.0",
     "pydantic>=2.9.0",
     "pydantic-settings>=2.6.0",
