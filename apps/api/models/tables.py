@@ -155,6 +155,20 @@ class DocumentChunk(Base):
     document: Mapped[Document] = relationship(back_populates="chunks")
 
 
+class ChunkEmbedding(Base):
+    __tablename__ = "chunk_embeddings"
+
+    chunk_id: Mapped[str] = mapped_column(
+        String, ForeignKey("document_chunks.id", ondelete="CASCADE"), primary_key=True
+    )
+    model_name: Mapped[str] = mapped_column(String, nullable=False)
+    model_revision: Mapped[str] = mapped_column(String, nullable=False)
+    dimensions: Mapped[int] = mapped_column(nullable=False)
+    text_hash: Mapped[str] = mapped_column(String, nullable=False)
+    vector_json: Mapped[list[float]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[str] = mapped_column(String, nullable=False)
+
+
 class Report(Base):
     __tablename__ = "reports"
 

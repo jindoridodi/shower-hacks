@@ -1,6 +1,8 @@
 # Node / Next.js
 node_modules/
 .next/
+playwright-report/
+test-results/
 
 # Byte-compiled / optimized / DLL files
 .DS_Store

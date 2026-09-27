@@ -2,6 +2,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEV_DATABASE_FILENAME = "borrowed_intimacy.db"
@@ -48,6 +49,11 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = ""
     llm_timeout_seconds: float = 30.0
+    embeddings_enabled: bool = False
+    embedding_model: str = "BAAI/bge-small-en-v1.5"
+    embedding_model_revision: str = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"
+    embedding_cache_dir: str | None = None
+    embedding_batch_size: int = Field(default=16, ge=1, le=128)
 
     @property
     def database_path(self) -> Path:

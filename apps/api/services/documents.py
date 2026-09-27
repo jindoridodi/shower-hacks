@@ -13,6 +13,7 @@ from apps.api.clock import utc_now
 from apps.api.db import transaction
 from apps.api.errors import APIError
 from apps.api.models import Document, DocumentChunk, Project
+from apps.api.services.embeddings import embedding_settings, semantic_search, stage_embeddings
 from apps.api.services.hashing import sha256_text
 from apps.api.services.sources import get_source
 
@@ -170,6 +171,9 @@ def stage_chunks(
         )
         db.add(row)
         rows.append(row)
+    if embedding_settings(db).embeddings_enabled and rows:
+        db.flush()
+        stage_embeddings(db, rows)
     return rows
 
 
@@ -214,6 +218,12 @@ def search_chunks(
     if project_id is not None and db.get(Project, project_id) is None:
         raise APIError(404, "project_not_found", "Project not found")
 
+    if not 1 <= limit <= 100:
+        raise APIError(422, "invalid_search_limit", "Search limit must be between 1 and 100")
+    if embedding_settings(db).embeddings_enabled:
+        if not query.strip():
+            raise APIError(422, "invalid_search", "Search query needs text")
+        return [ChunkHit(**row) for row in semantic_search(db, query, project_id=project_id, limit=limit)]
     fts_query = _fts_query(query)
     project_clause = ""
     params: dict[str, object] = {"query": fts_query, "limit": limit}
