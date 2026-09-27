@@ -1,1 +1,1 @@
-"""Application packages for Borrowed Intimacy."""
+"""Application packages for freakypeeky."""
