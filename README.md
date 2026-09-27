@@ -16,11 +16,11 @@ The project treats discovery results as suggestions, not identity proof. It does
 - Private Instagram profiles return only limited metadata; biography, image, external URL, category, and posts are omitted.
 - Source, crawl, document, chunk, report, and approval API routes backed by SQLite.
 - An OpenAI-compatible LLM adapter for evidence-grounded reports and review-only communication drafts.
-- A branded Next.js prototype UI and a separate plain browser test UI for the OSINT API.
+- A branded Next.js prototype frontend for the project experience.
 
 ## Current limitations
 
-- The Next.js UI at port `3000` still uses mock search/personalization data; it is not fully connected to the live API.
+- The Next.js UI at port `3000` still uses mock search and personalization data; it does not call the live API yet. Use Swagger at port `8000` to exercise the backend directly.
 - Discovery candidates are possible username matches, not verified accounts belonging to one person.
 - Live username providers and Apify can be rate-limited or blocked by their upstream services.
 - Crawl jobs and report generation require configured sources, approved URLs, and their respective provider keys.
@@ -42,7 +42,7 @@ The project treats discovery results as suggestions, not identity proof. It does
 
 ```text
 apps/
-  api/                 FastAPI app, routes, services, schemas, and test UI
+  api/                 FastAPI app, routes, services, and schemas
   web/                 Next.js visual prototype
 data/fixtures/         Deterministic discovery, Instagram, report, and draft data
 db/migrations/         SQLite migrations
@@ -67,7 +67,7 @@ Create the Python environment and install the backend:
 cd /Users/chuu/Desktop/shower-hacks
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -e '.[dev]'
+pip install -e '.[dev,osint]'
 cp .env.example .env
 python scripts/migrate.py
 ```
@@ -88,13 +88,16 @@ LLM_BASE_URL=https://api.openai.com/v1
 LLM_MODEL=
 
 # Optional crawling
+FIRECRAWL_API_KEY=
 CRAWL_ALLOWED_URLS=
 CRAWL_TERMS_ACCEPTED_HOSTS=
 ```
 
 Keep secrets in `.env`; never place them in frontend code or commit them.
 
-## Run the API and OSINT test UI
+`SPIDERFOOT_*` entries still present in `.env.example` are unused legacy settings and can be ignored.
+
+## Run the API
 
 Start FastAPI:
 
@@ -106,7 +109,6 @@ uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 
 Useful local pages:
 
-- OSINT test UI: <http://127.0.0.1:8000/>
 - OpenAPI/Swagger UI: <http://127.0.0.1:8000/docs>
 - Health: <http://127.0.0.1:8000/api/health>
 
@@ -143,9 +145,11 @@ Open <http://localhost:3000>.
 | --- | --- | --- |
 | `GET` | `/api/health` | Database and provider-configuration status |
 | `POST` | `/api/discovery` | Discover public username candidates or inspect a direct URL |
-| `POST` | `/api/projects` | Create a project for saved public links |
-| `GET` | `/api/projects` | List saved-link projects |
-| `POST` | `/api/projects/{project_id}/sources` | Save a public URL for a username in a project |
+| `POST` | `/api/osint/projects` | Create a project for username-scoped saved public links |
+| `GET` | `/api/osint/projects` | List saved-link projects |
+| `POST` | `/api/osint/projects/{project_id}/sources` | Save a public URL for a username in an OSINT project |
+| `GET` | `/api/osint/projects/{project_id}/sources?username=...` | List saved links for a username |
+| `POST` | `/api/projects/{project_id}/sources` | Add a canonical source URL to a corpus project |
 | `POST` | `/instagram/profiles` | Look up one Instagram username through Apify or fixtures |
 | `POST` | `/api/graph/export` | Export discovery evidence graph data as CSV ZIP or GEXF |
 | `POST` | `/api/llm/ping` | Verify the configured LLM returns `LLM_OK` |
@@ -175,4 +179,3 @@ python scripts/llm_ping.py
 - Discovery, Instagram, crawling, and generation remain separate steps. A discovery result does not automatically become a source or crawl job.
 - Communication drafts are AI-generated, require human review, and are never sent by the application.
 - The product is designed for public, user-selected sources only. Respect platform terms and applicable law when operating live providers.
-- Some internal package and API-display names still use the earlier “Borrowed Intimacy” name; the project name is now **freakypeeky**.

@@ -8,7 +8,6 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -46,7 +45,7 @@ def create_app(
 
     app = FastAPI(
         lifespan=lifespan,
-        title="Borrowed Intimacy API",
+        title="freakypeeky API",
         version="0.1.0",
         summary="Source, crawl, document, discovery, and evidence API",
     )
@@ -98,10 +97,6 @@ def create_app(
             "firecrawlConfigured": bool(settings.firecrawl_api_key),
             "crawlWorkerCommand": "python -m workers.crawl_worker --once",
         }
-
-    static_directory = Path(__file__).resolve().parent / "static"
-    if static_directory.exists():
-        app.mount("/", StaticFiles(directory=static_directory, html=True), name="osint-test-ui")
 
     return app
 

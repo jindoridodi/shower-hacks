@@ -354,7 +354,7 @@ Do not treat several providers as independent when they consume the same underly
 
 # Frontend changes
 
-Update the OSINT test UI after backend providers are stable:
+Update the freakypeeky frontend after backend providers are stable:
 
 - Add provider checkboxes for Sherlock, Maigret, and WhatsMyName.
 - Show provider evidence on each candidate.
