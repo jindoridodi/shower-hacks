@@ -65,6 +65,32 @@ class CommunicationDraftGeneratorTests(unittest.TestCase):
         with self.assertRaisesRegex(CommunicationDraftError, "unavailable sourceIds"):
             generate_communication_draft(recipient="Alex", evidence_excerpts=self.evidence, model=model)
 
+    def test_accepts_a_fenced_json_response(self) -> None:
+        response = {
+            "label": "AI-generated draft — review before use",
+            "recipient": "Alex",
+            "subject": "Hello",
+            "body": "A supported source.",
+            "sourceIds": ["src_portfolio"],
+            "reviewRequired": True,
+        }
+
+        class FencedModel:
+            def generate(self, _prompt: str) -> str:
+                return f"```json\n{json.dumps(response)}\n```"
+
+        draft = generate_communication_draft(recipient="Alex", evidence_excerpts=self.evidence, model=FencedModel())
+        self.assertEqual(draft["subject"], "Hello")
+
+    def test_falls_back_to_selected_evidence_for_invalid_json(self) -> None:
+        class InvalidModel:
+            def generate(self, _prompt: str) -> str:
+                return "A formatted draft without JSON"
+
+        draft = generate_communication_draft(recipient="Alex", evidence_excerpts=self.evidence, model=InvalidModel())
+        self.assertTrue(draft["body"])
+        self.assertEqual(set(draft["sourceIds"]), {"src_portfolio", "src_project", "src_talk"})
+
     def test_rejects_a_missing_label_or_review_requirement(self) -> None:
         model = FakeDraftModel(
             {

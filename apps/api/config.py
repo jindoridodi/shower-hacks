@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://api.openai.com/v1"
     llm_model: str = ""
     llm_timeout_seconds: float = 30.0
+    llm_max_tokens: int = 250
     embeddings_enabled: bool = False
     embedding_model: str = "BAAI/bge-small-en-v1.5"
     embedding_model_revision: str = "5c38ec7c405ec4b44b94cc5a9bb96e735b38267a"

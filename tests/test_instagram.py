@@ -279,3 +279,86 @@ class _RaisingScraper:
 
     def scrape_profile(self, _username):
         raise self.error
+
+
+def test_ingest_profile_stores_bounded_retrievable_evidence(client, monkeypatch):
+    project = client.post("/projects", json={"name": "Instagram"}).json()
+    profile = InstagramProfileRead(
+        username="natgeo",
+        full_name="National Geographic",
+        biography="Exploring the world",
+        profile_url="https://www.instagram.com/natgeo/",
+        profile_picture_url=None,
+        external_url=None,
+        category="Media",
+        followers_count=1,
+        follows_count=2,
+        posts_count=3,
+        is_verified=True,
+        is_private=False,
+        recent_posts=[
+            {
+                "caption": "Waterfall expedition " + "x" * 1200,
+                "url": "https://www.instagram.com/p/waterfall/",
+                "timestamp": "2026-09-01T10:00:00Z",
+                "likes_count": 4,
+                "comments_count": 5,
+            }
+        ],
+    )
+
+    class Scraper:
+        def scrape_profile(self, username):
+            assert username == "natgeo"
+            return profile
+
+    monkeypatch.setattr("apps.api.routes.instagram.get_instagram_profile_scraper", lambda: Scraper())
+    created = client.post(
+        f"/instagram/projects/{project['id']}/profiles",
+        json={"username": "natgeo"},
+    )
+
+    assert created.status_code == 201
+    body = created.json()
+    assert body["profile"]["username"] == "natgeo"
+    assert body["document_deduplicated"] is False
+    assert body["chunk_count"] > 0
+    chunks = client.get(f"/documents/{body['document_id']}/chunks").json()
+    assert all(len(chunk["text"]) <= 1000 for chunk in chunks)
+    assert "x" * 1001 not in "".join(chunk["text"] for chunk in chunks)
+    found = client.get(
+        "/search/chunks",
+        params={"q": "waterfall", "project_id": project["id"]},
+    )
+    assert found.status_code == 200
+    assert found.json()[0]["source_id"] == body["source_id"]
+
+    captured = {}
+
+    def generate_report(**kwargs):
+        captured.update(kwargs)
+        return {"ok": True}
+
+    monkeypatch.setattr("apps.api.routes.generation.generate_report", generate_report)
+    generated = client.post(
+        f"/api/projects/{project['id']}/reports",
+        json={"reportId": "natgeo-report", "searchQuery": "waterfall", "useFixtures": True},
+    )
+    assert generated.status_code == 200
+    assert generated.json() == {"ok": True}
+    assert captured["evidence_excerpts"] == [
+        {
+            "sourceId": body["source_id"],
+            "text": found.json()[0]["text"],
+            "sensitivityStatus": "safe",
+        }
+    ]
+
+    repeated = client.post(
+        f"/instagram/projects/{project['id']}/profiles",
+        json={"username": "natgeo"},
+    )
+    assert repeated.status_code == 200
+    assert repeated.json()["source_id"] == body["source_id"]
+    assert repeated.json()["document_id"] == body["document_id"]
+    assert repeated.json()["document_deduplicated"] is True

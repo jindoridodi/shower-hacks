@@ -7,6 +7,14 @@ class InstagramProfileRequest(BaseModel):
     username: str = Field(min_length=1, max_length=30, pattern=r"^[A-Za-z0-9._]+$")
 
 
+class InstagramProfileIngestRead(BaseModel):
+    profile: "InstagramProfileRead"
+    source_id: str
+    document_id: str
+    document_deduplicated: bool
+    chunk_count: int
+
+
 class InstagramPostRead(BaseModel):
     caption: str
     url: str | None

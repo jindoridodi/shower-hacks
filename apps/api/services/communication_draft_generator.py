@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -16,11 +17,19 @@ _ROOT = Path(__file__).resolve().parents[3]
 _PROMPT_PATH = _ROOT / "packages/prompts/communication_draft.txt"
 _DRAFT_FIXTURE_PATH = _ROOT / "data/fixtures/communication-draft.json"
 _LABEL = "AI-generated draft — review before use"
+_TONE_INSTRUCTIONS = {
+    "romantic": "Write warm, sincere, tender, confident romantic prose. Explain why literal details feel special, with occasional playful flirtation. Do not mention social media, profiles, research, data, or AI.",
+    "poetic": "Write lyrical, intimate, atmospheric prose with vivid imagery and varied rhythm. Turn literal details into poetic observations without inventing facts or mentioning their source.",
+    "chaotic": "Write affectionate, fast-paced, playful prose with dramatic interruptions, harmless hyperbole, and occasional ALL CAPS. Keep every joke tied to literal details and do not mention their source.",
+    "unhinged": "Write affectionate, comically overdramatic prose that escalates from ordinary details. No threats, surveillance, possessiveness, sexual harassment, invented facts, or mentions of their source.",
+}
 
 
 def generate_communication_draft(
     *,
     recipient: str,
+    tone: str = "romantic",
+    plain_text: bool = False,
     evidence_excerpts: Sequence[Mapping[str, Any]],
     model: TextModel | None = None,
     use_fixtures: bool = False,
@@ -42,7 +51,18 @@ def generate_communication_draft(
     else:
         if model is None:
             raise CommunicationDraftError("A draft model is required when fixture mode is disabled.")
-        draft = _parse_draft(model.generate(_render_prompt(recipient, safe_evidence)))
+        response = model.generate(_render_prompt(recipient, safe_evidence, tone, plain_text))
+        if plain_text:
+            draft = _text_draft(recipient, response, safe_evidence, tone)
+        else:
+            generate_json = getattr(model, "generate_json", model.generate)
+            response = generate_json(_render_prompt(recipient, safe_evidence, tone, plain_text))
+            try:
+                draft = _parse_draft(response)
+            except CommunicationDraftError as error:
+                if str(error) != "The draft model returned invalid JSON.":
+                    raise
+                draft = _fallback_draft(recipient, safe_evidence, tone)
 
     _validate_draft(draft, recipient, safe_evidence)
     return draft
@@ -55,17 +75,30 @@ def _load_fixture_draft(recipient: str) -> dict[str, Any]:
     return draft
 
 
-def _render_prompt(recipient: str, evidence_excerpts: Sequence[Mapping[str, Any]]) -> str:
+def _render_prompt(recipient: str, evidence_excerpts: Sequence[Mapping[str, Any]], tone: str = "romantic", plain_text: bool = False) -> str:
     return (
         _PROMPT_PATH.read_text()
         .replace("{{recipient}}", recipient)
+        .replace("{{tone}}", _TONE_INSTRUCTIONS.get(tone, _TONE_INSTRUCTIONS["romantic"]))
+        .replace("{{output_format}}", "Return only the letter text, with no JSON or Markdown fence." if plain_text else "Return JSON only, with the shape above.")
         .replace("{{evidence_excerpts}}", json.dumps(evidence_excerpts, ensure_ascii=False))
     )
 
 
+def _text_draft(recipient: str, body: str, evidence_excerpts: Sequence[Mapping[str, Any]], tone: str) -> dict[str, Any]:
+    if not body.strip():
+        return _fallback_draft(recipient, evidence_excerpts, tone)
+    try:
+        return _parse_draft(body)
+    except CommunicationDraftError:
+        pass
+    clean_body = re.sub(r"\s*\(instagram:[^)]+\)", "", body).strip()
+    return {"label": _LABEL, "recipient": recipient, "subject": "A note for you", "body": clean_body, "sourceIds": list(dict.fromkeys(excerpt["sourceId"] for excerpt in evidence_excerpts if isinstance(excerpt.get("sourceId"), str))), "reviewRequired": True}
+
+
 def _parse_draft(response: str) -> dict[str, Any]:
     try:
-        draft = json.loads(response)
+        draft = json.loads(_json_object(response))
     except json.JSONDecodeError as error:
         raise CommunicationDraftError("The draft model returned invalid JSON.") from error
 
@@ -73,6 +106,37 @@ def _parse_draft(response: str) -> dict[str, Any]:
         raise CommunicationDraftError("The draft model must return a JSON object.")
 
     return draft
+
+
+def _json_object(response: str) -> str:
+    body = response.strip()
+    if body.startswith("```") and body.endswith("```"):
+        body = body.split("\n", 1)[1].rsplit("\n", 1)[0].strip()
+    start = body.find("{")
+    end = body.rfind("}")
+    return body[start : end + 1] if start >= 0 and end >= start else body
+
+
+def _fallback_draft(recipient: str, evidence_excerpts: Sequence[Mapping[str, Any]], tone: str) -> dict[str, Any]:
+    excerpts = [excerpt.get("text", "").strip()[:500] for excerpt in evidence_excerpts]
+    source_ids = list(dict.fromkeys(excerpt["sourceId"] for excerpt in evidence_excerpts if isinstance(excerpt.get("sourceId"), str)))
+    return {
+        "label": _LABEL,
+        "recipient": recipient,
+        "subject": "A note about your public posts",
+        "body": f"Dear {recipient},\n\n" + "\n\n".join(f"“{text}”" for text in excerpts if text) + f"\n\n{_fallback_closing(tone)}",
+        "sourceIds": source_ids,
+        "reviewRequired": True,
+    }
+
+
+def _fallback_closing(tone: str) -> str:
+    return {
+        "romantic": "There is something quietly lovely in the details you choose to share.\n\nWith admiration,\n[your name]",
+        "poetic": "Even small details can leave a little light behind.\n\nThinking of that light,\n[your name]",
+        "chaotic": "Honestly, these details have rearranged the furniture in my brain.\n\nFondly and dramatically,\n[your name]",
+        "unhinged": "I was prepared to be normal about this. Clearly, that plan has failed.\n\nWith disproportionate admiration,\n[your name]",
+    }.get(tone, "With appreciation,\n[your name]")
 
 
 def _validate_draft(

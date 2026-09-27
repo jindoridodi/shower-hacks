@@ -14,6 +14,7 @@ class OpenAICompatibleTextModel:
             raise TextModelError("LLM_API_KEY and LLM_MODEL must be configured.")
 
         self.model = settings.llm_model
+        self._max_tokens = settings.llm_max_tokens
         self._client = client or httpx.Client(timeout=settings.llm_timeout_seconds)
         self._owns_client = client is None
         self._url = f"{settings.llm_base_url}/chat/completions"
@@ -23,15 +24,25 @@ class OpenAICompatibleTextModel:
         }
 
     def generate(self, prompt: str) -> str:
+        return self._generate(prompt, json_mode=False)
+
+    def generate_json(self, prompt: str) -> str:
+        return self._generate(prompt, json_mode=True)
+
+    def _generate(self, prompt: str, *, json_mode: bool) -> str:
+        payload = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+            "max_tokens": self._max_tokens,
+        }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
         try:
             response = self._client.post(
                 self._url,
                 headers=self._headers,
-                json={
-                    "model": self.model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "temperature": 0,
-                },
+                json=payload,
             )
             response.raise_for_status()
         except httpx.HTTPStatusError as error:

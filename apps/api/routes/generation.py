@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from apps.api.config import get_settings
@@ -17,8 +17,7 @@ from apps.api.services.communication_draft_generator import (
 )
 from apps.api.services.openai_compatible_text_model import OpenAICompatibleTextModel
 from apps.api.services.report_generator import ReportGenerationError, generate_report
-from apps.api.services.evidence import list_safe_excerpts
-from apps.api.services.reports import persist_generated_report
+from apps.api.services.retrieval import search_chunks
 from apps.api.services.text_model import TextModelError
 
 router = APIRouter(tags=["generation"])
@@ -28,11 +27,17 @@ class ReportRequest(BaseModel):
     reportId: str
     generatedAt: str | None = None
     mode: Literal["factual_profile", "uncertainty_report"] = "factual_profile"
+    evidenceExcerpts: list[dict[str, Any]] = Field(default_factory=list)
+    searchQuery: str | None = Field(default=None, min_length=1, max_length=500)
+    evidenceLimit: int = Field(default=10, ge=1, le=20)
     useFixtures: bool = False
 
 
 class DraftRequest(BaseModel):
     recipient: str
+    tone: Literal["romantic", "poetic", "chaotic", "unhinged"] = "romantic"
+    plainText: bool = False
+    evidenceExcerpts: list[dict[str, Any]] = Field(default_factory=list)
     useFixtures: bool = False
 
 
@@ -75,22 +80,30 @@ def create_generated_report(
 ) -> dict[str, Any]:
     model = None
     try:
-        evidence_excerpts = [excerpt.as_dict() for excerpt in list_safe_excerpts(db, project_id)]
+        evidence = request.evidenceExcerpts
+        if request.searchQuery is not None:
+            evidence = [
+                {
+                    "sourceId": hit.source_id,
+                    "text": hit.text,
+                    "sensitivityStatus": "safe",
+                }
+                for hit in search_chunks(
+                    db,
+                    request.searchQuery,
+                    project_id=project_id,
+                    limit=request.evidenceLimit,
+                )
+            ]
         if not request.useFixtures:
             model = _model()
         generated = generate_report(
             report_id=request.reportId,
             generated_at=_generated_at(request.generatedAt),
             mode=request.mode,
-            evidence_excerpts=evidence_excerpts,
+            evidence_excerpts=evidence,
             model=model,
             use_fixtures=request.useFixtures,
-        )
-        persist_generated_report(
-            db,
-            project_id=project_id,
-            generated_report=generated,
-            evidence_excerpts=evidence_excerpts,
         )
         return generated
     except (ReportGenerationError, TextModelError, ValueError) as error:
@@ -104,16 +117,16 @@ def create_generated_report(
 def create_draft(
     project_id: str,
     request: DraftRequest,
-    db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     model = None
     try:
-        evidence_excerpts = [excerpt.as_dict() for excerpt in list_safe_excerpts(db, project_id)]
         if not request.useFixtures:
             model = _model()
         return generate_communication_draft(
             recipient=request.recipient,
-            evidence_excerpts=evidence_excerpts,
+            tone=request.tone,
+            plain_text=request.plainText,
+            evidence_excerpts=request.evidenceExcerpts,
             model=model,
             use_fixtures=request.useFixtures,
         )

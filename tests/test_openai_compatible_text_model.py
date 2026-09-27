@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import unittest
 
@@ -19,6 +21,7 @@ class OpenAICompatibleTextModelTests(unittest.TestCase):
         def handler(request: httpx.Request) -> httpx.Response:
             self.assertEqual(str(request.url), "https://llm.test/v1/chat/completions")
             self.assertEqual(request.headers["Authorization"], "Bearer test-key")
+            self.assertEqual(json.loads(request.content)["max_tokens"], 250)
             return httpx.Response(
                 200,
                 json={"choices": [{"message": {"content": "LLM_OK"}}]},

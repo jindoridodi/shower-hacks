@@ -13,9 +13,17 @@ from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 import certifi
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from apps.api.config import Settings, get_settings
+from apps.api.models import Document, Source
 from apps.api.schemas.instagram import InstagramPostRead, InstagramProfileRead
+from apps.api.services.chunker import chunk_text
+from apps.api.clock import utc_now
+from apps.api.services.documents import create_document
+from apps.api.services.projects import get_project
+from apps.api.services.sources import create_source
 
 APIFY_API_URL = "https://api.apify.com/v2/actors/{actor}/run-sync-get-dataset-items"
 MAX_RECENT_POSTS = 10
@@ -202,6 +210,49 @@ def _tls_context() -> ssl.SSLContext:
     return ssl.create_default_context(cafile=certifi.where())
 
 
+def ingest_profile(
+    db: Session,
+    *,
+    project_id: str,
+    username: str,
+    scraper: ApifyInstagramProfileScraper | None = None,
+) -> tuple[InstagramProfileRead, Source, Document, bool, int]:
+    profile = (scraper or get_instagram_profile_scraper()).scrape_profile(username)
+    get_project(db, project_id)
+    profile_url = f"https://www.instagram.com/{profile.username}"
+    source = db.scalar(
+        select(Source).where(
+            Source.project_id == project_id,
+            Source.canonical_url == profile_url,
+        )
+    )
+    if source is None:
+        source = create_source(db, project_id, profile_url)
+    text = _profile_text(profile)
+    chunks = chunk_text(
+        text,
+        document_id="",
+        source_id=source.id,
+        sensitivity_status="clear",
+    )
+    now = utc_now()
+    source.status = "succeeded"
+    source.scraped_at = now
+    source.updated_at = now
+    document, created = create_document(
+        db,
+        source_id=source.id,
+        title=f"Instagram profile: @{profile.username}",
+        content_type="text/plain",
+        raw_text=None,
+        cleaned_text=text,
+        sensitivity_status="clear",
+        content_hash=None,
+        chunks=[(chunk["chunk_index"], chunk["text"]) for chunk in chunks],
+    )
+    return profile, source, document, not created, len(chunks)
+
+
 def _post(item: Mapping[str, object]) -> InstagramPostRead:
     return InstagramPostRead(
         caption=_string(item.get("caption")) or "",
@@ -214,6 +265,32 @@ def _post(item: Mapping[str, object]) -> InstagramPostRead:
 
 def _is_valid_username(value: str) -> bool:
     return 1 <= len(value) <= 30 and all(character.isalnum() or character in "._" for character in value)
+
+
+def _profile_text(profile: InstagramProfileRead) -> str:
+    lines = [
+        f"Instagram profile: @{profile.username}",
+        f"Profile URL: {profile.profile_url or f'https://www.instagram.com/{profile.username}/'}",
+        f"Full name: {profile.full_name or ''}",
+        f"Biography: {profile.biography or ''}",
+        f"Category: {profile.category or ''}",
+        f"Verified: {profile.is_verified}",
+        f"Private: {profile.is_private}",
+        f"Followers: {profile.followers_count if profile.followers_count is not None else ''}",
+        f"Following: {profile.follows_count if profile.follows_count is not None else ''}",
+        f"Posts: {profile.posts_count if profile.posts_count is not None else ''}",
+    ]
+    for index, post in enumerate(profile.recent_posts, start=1):
+        lines.extend(
+            [
+                "",
+                f"Post {index}",
+                f"Published: {post.timestamp or ''}",
+                f"Post URL: {post.url or ''}",
+                f"Caption excerpt: {post.caption[:1000]}",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def _string(value: object) -> str | None:

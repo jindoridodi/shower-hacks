@@ -2,18 +2,18 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import {
+  type CandidateSource,
+  type DiscoveryResponse,
+  type InstagramProfile,
+  ApiError,
+  discover,
+  fetchInstagramProfile,
+} from "../lib/api";
+import { useProject } from "../lib/use-project";
 
-type Account = {
-  id: string;
-  platform: string;
-  username: string;
-  displayName: string;
-  bio: string;
-  avatar: string;
-  followers: string;
-  profileUrl: string;
-};
+// ── Types ──────────────────────────────────────────────────
 
 type SavedProfile = {
   id: string;
@@ -22,70 +22,57 @@ type SavedProfile = {
   platform: string;
   profileUrl: string;
   savedAt: number;
+  projectId?: string;
 };
 
-const MOCK_RESULTS: Record<string, Account[]> = {
-  default: [
-    {
-      id: "1",
-      platform: "Instagram",
-      username: "@avery.chen.pdx",
-      displayName: "Avery Chen",
-      bio: "designer / archivist / portland. community storytelling & public memory projects",
-      avatar: "📸",
-      followers: "2.4k",
-      profileUrl: "https://instagram.com/avery.chen.pdx",
-    },
-    {
-      id: "2",
-      platform: "Twitter / X",
-      username: "@averychen_",
-      displayName: "avery chen",
-      bio: "open archives, public records, design research. she/her",
-      avatar: "🐦",
-      followers: "891",
-      profileUrl: "https://x.com/averychen_",
-    },
-    {
-      id: "3",
-      platform: "LinkedIn",
-      username: "avery-chen-pdx",
-      displayName: "Avery Chen",
-      bio: "Design Researcher at Portland Public Archives • University of Oregon '21",
-      avatar: "💼",
-      followers: "500+",
-      profileUrl: "https://linkedin.com/in/avery-chen-pdx",
-    },
-    {
-      id: "4",
-      platform: "TikTok",
-      username: "@averychennn",
-      displayName: "avery 🗂️",
-      bio: "archive nerd. making history cool. portland based 🌲",
-      avatar: "🎵",
-      followers: "12.3k",
-      profileUrl: "https://tiktok.com/@averychennn",
-    },
-    {
-      id: "5",
-      platform: "GitHub",
-      username: "averychen",
-      displayName: "Avery Chen",
-      bio: "data viz & civic tech. contributions to open-source archive tools.",
-      avatar: "💻",
-      followers: "156",
-      profileUrl: "https://github.com/averychen",
-    },
-  ],
+function instagramUsernameFromUrl(value: string): string | null {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const username = url.pathname.split("/").filter(Boolean)[0];
+    return host === "instagram.com" && username && /^[A-Za-z0-9._]+$/.test(username)
+      ? username
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+// ── Platform styling ───────────────────────────────────────
+
+const PLATFORM_EMOJI: Record<string, string> = {
+  Instagram: "📸",
+  Twitter: "🐦",
+  "Twitter / X": "🐦",
+  LinkedIn: "💼",
+  TikTok: "🎵",
+  GitHub: "💻",
+  Facebook: "👤",
+  Reddit: "🤖",
+  YouTube: "🎬",
+  Pinterest: "📌",
 };
 
 const PLATFORM_COLORS: Record<string, string> = {
   Instagram: "from-freaky-pink to-freaky-purple",
+  Twitter: "from-freaky-blue to-freaky-blue",
   "Twitter / X": "from-freaky-blue to-freaky-blue",
   LinkedIn: "from-blue-400 to-blue-600",
   TikTok: "from-freaky-dark to-freaky-dark",
   GitHub: "from-gray-700 to-gray-900",
+  Facebook: "from-blue-500 to-blue-700",
+  Reddit: "from-orange-500 to-orange-700",
+  YouTube: "from-red-500 to-red-700",
+  Pinterest: "from-red-400 to-red-600",
 };
+
+const CONFIDENCE_BADGE: Record<string, string> = {
+  high: "bg-green-100 text-green-700 border-green-300",
+  medium: "bg-yellow-100 text-yellow-700 border-yellow-300",
+  low: "bg-red-100 text-red-700 border-red-300",
+};
+
+// ── LocalStorage helpers ───────────────────────────────────
 
 function loadProfiles(): SavedProfile[] {
   try {
@@ -102,13 +89,24 @@ function saveProfiles(profiles: SavedProfile[]) {
   } catch {}
 }
 
+// ── Page ───────────────────────────────────────────────────
+
 export default function HomePage() {
   const router = useRouter();
+  const { project, loading: projectLoading, create: createProj, clear: clearProject } = useProject();
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Account[]>([]);
+  const [candidates, setCandidates] = useState<CandidateSource[]>([]);
   const [searching, setSearching] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [scraping, setScraping] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const [providersUsed, setProvidersUsed] = useState<string[]>([]);
+
+  const [selectedCandidate, setSelectedCandidate] = useState<CandidateSource | null>(null);
+  const [igProfile, setIgProfile] = useState<InstagramProfile | null>(null);
+  const [igLoading, setIgLoading] = useState(false);
+  const [igError, setIgError] = useState<string | null>(null);
+
   const [savedProfiles, setSavedProfiles] = useState<SavedProfile[]>([]);
   const [showSaved, setShowSaved] = useState(false);
 
@@ -116,47 +114,100 @@ export default function HomePage() {
     setSavedProfiles(loadProfiles());
   }, []);
 
-  function handleSearch() {
-    if (!query.trim()) return;
+  const handleSearch = useCallback(async () => {
+    const q = query.trim();
+    if (!q) return;
     setSearching(true);
-    setResults([]);
+    setCandidates([]);
     setSearched(false);
+    setSearchError(null);
+    setWarnings([]);
+    setProvidersUsed([]);
+    setSelectedCandidate(null);
+    setIgProfile(null);
+    setIgError(null);
 
-    const mockAccounts = MOCK_RESULTS.default;
-    setTimeout(() => setResults(mockAccounts.slice(0, 2)), 500);
-    setTimeout(() => setResults(mockAccounts.slice(0, 4)), 900);
-    setTimeout(() => {
-      setResults(mockAccounts);
-      setSearching(false);
+    try {
+      let pid = project?.id;
+      if (!pid) {
+        const p = await createProj(q);
+        pid = p?.id ?? undefined;
+      }
+      const res: DiscoveryResponse = await discover(q, pid);
+      const directUsername = instagramUsernameFromUrl(q);
+      const resolvedCandidates = res.candidates.map((candidate) =>
+        directUsername && candidate.platform.toLowerCase() === "instagram"
+          ? { ...candidate, candidateUsername: directUsername }
+          : candidate,
+      );
+      setCandidates(resolvedCandidates);
+      setWarnings(res.warnings);
+      setProvidersUsed(res.providersUsed);
       setSearched(true);
-    }, 1300);
+      const directCandidate = resolvedCandidates.find(
+        (candidate) => candidate.platform.toLowerCase() === "instagram" && candidate.candidateUsername,
+      );
+      if (directCandidate) await handleCandidateClick(directCandidate);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.status === 422) {
+          setSearchError("invalid query — try a username or profile link");
+        } else {
+          setSearchError(err.message);
+        }
+      } else {
+        setSearchError("could not reach the backend — is the API running?");
+      }
+    } finally {
+      setSearching(false);
+    }
+  }, [query, project, createProj]);
+
+  async function handleCandidateClick(candidate: CandidateSource) {
+    setSelectedCandidate(candidate);
+    setIgProfile(null);
+    setIgError(null);
+
+    if (candidate.platform.toLowerCase() === "instagram" && candidate.candidateUsername) {
+      setIgLoading(true);
+      try {
+        const profile = await fetchInstagramProfile(candidate.candidateUsername);
+        setIgProfile(profile);
+      } catch (err) {
+        if (err instanceof ApiError) {
+          if (err.code === "apify_not_configured") {
+            setIgError("Instagram lookup isn't configured — APIFY_API_TOKEN is missing on the backend.");
+          } else if (err.status === 404) {
+            setIgError("Instagram profile not found.");
+          } else if (err.status === 503) {
+            setIgError("Instagram lookup is temporarily unavailable.");
+          } else {
+            setIgError(err.message);
+          }
+        } else {
+          setIgError("could not reach the backend for Instagram lookup.");
+        }
+      } finally {
+        setIgLoading(false);
+      }
+    }
   }
 
-  function handleAccountClick(account: Account) {
-    setScraping(account.id);
-    setTimeout(() => {
-      const params = new URLSearchParams({
-        name: account.displayName,
-        username: account.username,
-        platform: account.platform,
-        profileUrl: account.profileUrl,
-      });
-      router.push(`/love-letters?${params.toString()}`);
-    }, 2000);
-  }
-
-  function handleSaveProfile(account: Account) {
+  function handleSaveProfile(candidate: CandidateSource) {
+    const username = igProfile?.username ?? candidate.candidateUsername;
+    if (!username) return;
     const existing = savedProfiles.find(
-      (p) => p.username === account.username && p.platform === account.platform,
+      (p) => p.username === username && p.platform === candidate.platform,
     );
     if (existing) return;
     const profile: SavedProfile = {
-      id: `${account.platform}-${account.username}-${Date.now()}`,
-      name: account.displayName,
-      username: account.username,
-      platform: account.platform,
-      profileUrl: account.profileUrl,
+      id: `${candidate.platform}-${username}-${Date.now()}`,
+      name: igProfile?.full_name ?? username,
+      username,
+      platform: candidate.platform,
+      profileUrl: candidate.url,
       savedAt: Date.now(),
+      projectId: project?.id,
     };
     const updated = [profile, ...savedProfiles];
     setSavedProfiles(updated);
@@ -175,14 +226,23 @@ export default function HomePage() {
       username: profile.username,
       platform: profile.platform,
       profileUrl: profile.profileUrl,
+      ...(profile.projectId ? { projectId: profile.projectId } : {}),
     });
     router.push(`/love-letters?${params.toString()}`);
   }
 
-  function isAccountSaved(account: Account) {
+  function isCandidateSaved(candidate: CandidateSource) {
+    const username = candidate.candidateUsername ?? candidate.url;
     return savedProfiles.some(
-      (p) => p.username === account.username && p.platform === account.platform,
+      (p) => p.username === username && p.platform === candidate.platform,
     );
+  }
+
+  function formatCount(n: number | null): string {
+    if (n == null) return "—";
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}m`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+    return n.toString();
   }
 
   const inputHint = query.includes("@")
@@ -250,12 +310,28 @@ export default function HomePage() {
             )}
           </button>
         </div>
-        {query.trim() && !searching && !searched && (
+        {query.trim() && !searching && !searched && !searchError && (
           <p className="mt-2 pl-2 font-display text-xs text-text-muted">
             {inputHint}
           </p>
         )}
       </div>
+
+      {/* Project indicator */}
+      {!projectLoading && project && (
+        <div className="mb-4 flex items-center gap-2 rounded-xl border-2 border-freaky-dark/15 bg-freaky-peach/15 px-4 py-2">
+          <span className="text-sm">📁</span>
+          <p className="flex-1 font-display text-xs font-bold text-freaky-dark/70">
+            project: {project.name}
+          </p>
+          <button
+            onClick={clearProject}
+            className="font-display text-[10px] font-bold text-text-muted transition-colors hover:text-freaky-red"
+          >
+            new project
+          </button>
+        </div>
+      )}
 
       {/* Saved profiles toggle */}
       <div className="mb-6 flex items-center justify-between">
@@ -292,7 +368,7 @@ export default function HomePage() {
                   key={profile.id}
                   className="flex items-center gap-3 rounded-2xl border-2 border-freaky-dark/20 bg-bg-card p-3 transition-all hover:border-freaky-dark/40"
                 >
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="font-display text-sm font-bold text-freaky-dark">
                       {profile.name}
                     </p>
@@ -320,123 +396,154 @@ export default function HomePage() {
       )}
 
       {/* Searching state */}
-      {searching && results.length === 0 && (
+      {searching && (
         <div className="py-12 text-center">
           <p className="animate-wiggle font-display text-2xl font-bold text-freaky-dark">
             snooping around... 🕵️
           </p>
+          <p className="mt-2 font-display text-sm text-text-muted">
+            running OSINT discovery providers
+          </p>
         </div>
       )}
 
-      {/* Results */}
-      {results.length > 0 && (
+      {/* Search error */}
+      {searchError && (
+        <div className="mb-8 rounded-2xl border-3 border-freaky-red/40 bg-freaky-red/5 px-5 py-4 text-center">
+          <p className="font-display text-sm font-bold text-freaky-red">
+            {searchError}
+          </p>
+          <button
+            onClick={handleSearch}
+            className="mt-3 rounded-xl border-2 border-freaky-red px-4 py-1.5 font-display text-xs font-bold text-freaky-red transition-all hover:bg-freaky-red hover:text-white"
+          >
+            try again
+          </button>
+        </div>
+      )}
+
+      {/* Warnings from discovery */}
+      {warnings.length > 0 && (
+        <div className="mb-4 rounded-2xl border-2 border-dashed border-yellow-400/50 bg-yellow-50/50 px-4 py-3">
+          {warnings.map((w, i) => (
+            <p key={i} className="font-display text-xs text-yellow-700">
+              ⚠️ {w}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Discovery results */}
+      {searched && !searching && (
         <div className="mb-8">
           <div className="mb-4">
             <h2 className="font-display text-xl font-bold text-freaky-dark">
-              {searching
-                ? "finding accounts..."
-                : `found ${results.length} accounts 👀`}
+              {candidates.length === 0
+                ? "no accounts found 😢"
+                : `found ${candidates.length} candidate${candidates.length !== 1 ? "s" : ""} 👀`}
             </h2>
-            {searched && (
+            {candidates.length > 0 && (
               <p className="mt-1 font-display text-xs text-text-muted">
-                click an account to start scraping & write love letters 💌
+                these are suggestions, not identity proof. click to inspect. providers: {providersUsed.join(", ") || "none"}
               </p>
             )}
           </div>
 
+          {candidates.length === 0 && (
+            <div className="rounded-2xl border-2 border-dashed border-freaky-dark/15 bg-bg-card/50 px-5 py-8 text-center">
+              <p className="font-display text-sm text-text-muted">
+                no matching profiles found. try a different username or link.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-3">
-            {results.map((account, i) => {
-              const isScraping = scraping === account.id;
-              const isDisabled = scraping !== null && !isScraping;
-              const alreadySaved = isAccountSaved(account);
+            {candidates.map((candidate, i) => {
+              const isSelected = selectedCandidate?.url === candidate.url;
+              const alreadySaved = isCandidateSaved(candidate);
+              const emoji = PLATFORM_EMOJI[candidate.platform] ?? "🌐";
 
               return (
                 <div
-                  key={account.id}
+                  key={`${candidate.url}-${i}`}
                   className="animate-pop-in"
-                  style={{ animationDelay: `${i * 80}ms` }}
+                  style={{ animationDelay: `${i * 60}ms` }}
                 >
                   <div
-                    className={`flex items-center gap-4 rounded-2xl border-3 p-4 transition-all ${
-                      isScraping
+                    className={`rounded-2xl border-3 p-4 transition-all ${
+                      isSelected
                         ? "border-freaky-red bg-freaky-red/5 shadow-[4px_4px_0_0] shadow-freaky-red"
-                        : isDisabled
-                          ? "border-freaky-dark/20 bg-bg-card opacity-40"
-                          : "border-freaky-dark bg-bg-card shadow-[3px_3px_0_0] shadow-freaky-dark"
+                        : "border-freaky-dark bg-bg-card shadow-[3px_3px_0_0] shadow-freaky-dark"
                     }`}
                   >
-                    {/* Platform badge */}
-                    <button
-                      onClick={() => handleAccountClick(account)}
-                      disabled={isDisabled || isScraping}
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-xl transition-transform hover:scale-110 disabled:hover:scale-100 cursor-pointer disabled:cursor-default"
-                    >
-                      <div className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${PLATFORM_COLORS[account.platform] ?? "from-gray-500 to-gray-700"}`}>
-                        <span>{account.avatar}</span>
-                      </div>
-                    </button>
+                    <div className="flex items-center gap-4">
+                      {/* Platform badge */}
+                      <button
+                        onClick={() => handleCandidateClick(candidate)}
+                        className="flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-xl transition-transform hover:scale-110"
+                      >
+                        <div
+                          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br text-xl ${PLATFORM_COLORS[candidate.platform] ?? "from-gray-500 to-gray-700"}`}
+                        >
+                          <span>{emoji}</span>
+                        </div>
+                      </button>
 
-                    {/* Info — clickable */}
-                    <button
-                      onClick={() => handleAccountClick(account)}
-                      disabled={isDisabled || isScraping}
-                      className="min-w-0 flex-1 text-left cursor-pointer disabled:cursor-default"
-                    >
-                      <div className="mb-0.5 flex items-center gap-2">
-                        <span className="font-display text-base font-bold text-freaky-dark">
-                          {account.displayName}
-                        </span>
-                        <span className="rounded-full bg-freaky-dark/10 px-2 py-0.5 font-display text-[10px] font-bold text-freaky-dark/60">
-                          {account.platform}
-                        </span>
-                      </div>
-                      <p className="font-mono text-xs text-freaky-dark/50">
-                        {account.username}
-                      </p>
-                      <p className="mt-0.5 truncate text-sm text-text-secondary">
-                        {account.bio}
-                      </p>
-                    </button>
-
-                    {/* Right side */}
-                    <div className="shrink-0 flex items-center gap-2">
-                      {isScraping ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <span className="inline-block animate-spin text-lg">
-                            🔍
+                      {/* Info */}
+                      <button
+                        onClick={() => handleCandidateClick(candidate)}
+                        className="min-w-0 flex-1 cursor-pointer text-left"
+                      >
+                        <div className="mb-0.5 flex items-center gap-2">
+                          <span className="font-display text-base font-bold text-freaky-dark">
+                            {candidate.candidateUsername ?? candidate.platform}
                           </span>
-                          <span className="font-display text-[10px] font-bold text-freaky-red">
-                            scraping...
+                          <span className="rounded-full bg-freaky-dark/10 px-2 py-0.5 font-display text-[10px] font-bold text-freaky-dark/60">
+                            {candidate.platform}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 font-display text-[10px] font-bold ${CONFIDENCE_BADGE[candidate.confidence]}`}
+                          >
+                            {candidate.confidence}
                           </span>
                         </div>
-                      ) : (
-                        <>
-                          <div className="text-right">
-                            <p className="font-display text-sm font-bold text-text-muted">
-                              {account.followers}
-                            </p>
-                            <p className="mt-0.5 font-display text-[10px] text-text-muted">
-                              followers
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleSaveProfile(account);
-                            }}
-                            disabled={alreadySaved}
-                            className={`rounded-lg border-2 p-1.5 text-sm transition-all ${
-                              alreadySaved
-                                ? "border-freaky-dark/10 bg-freaky-dark/5 text-text-muted cursor-default"
-                                : "border-freaky-dark/20 hover:border-freaky-pink hover:bg-freaky-pink/10 cursor-pointer"
-                            }`}
-                            title={alreadySaved ? "Already saved" : "Save profile"}
-                          >
-                            {alreadySaved ? "✅" : "💾"}
-                          </button>
-                        </>
-                      )}
+                        <p className="truncate font-mono text-xs text-freaky-dark/50">
+                          {candidate.url}
+                        </p>
+                        <p className="mt-0.5 text-sm text-text-secondary">
+                          {candidate.matchReason}
+                        </p>
+                      </button>
+
+                      {/* Save */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleSaveProfile(candidate);
+                        }}
+                        disabled={alreadySaved}
+                        className={`shrink-0 rounded-lg border-2 p-1.5 text-sm transition-all ${
+                          alreadySaved
+                            ? "cursor-default border-freaky-dark/10 bg-freaky-dark/5 text-text-muted"
+                            : "cursor-pointer border-freaky-dark/20 hover:border-freaky-pink hover:bg-freaky-pink/10"
+                        }`}
+                        title={alreadySaved ? "Already saved" : "Save profile"}
+                      >
+                        {alreadySaved ? "✅" : "💾"}
+                      </button>
                     </div>
+
+                    {/* Instagram profile detail (expanded) */}
+                    {isSelected && candidate.platform.toLowerCase() === "instagram" && (
+                      <div className="mt-4 border-t-2 border-freaky-dark/10 pt-4">
+                        <InstagramDetail
+                          profile={igProfile}
+                          loading={igLoading}
+                          error={igError}
+                          formatCount={formatCount}
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -446,7 +553,7 @@ export default function HomePage() {
       )}
 
       {/* No results hint */}
-      {!searching && !searched && results.length === 0 && (
+      {!searching && !searched && !searchError && candidates.length === 0 && (
         <div className="mt-4 grid grid-cols-3 gap-3 text-center">
           <HintCard emoji="👤" label="Name" example="Avery Chen" />
           <HintCard emoji="@" label="Username" example="@averychen_" />
@@ -454,6 +561,144 @@ export default function HomePage() {
         </div>
       )}
     </main>
+  );
+}
+
+// ── Instagram Detail Panel ─────────────────────────────────
+
+function InstagramDetail({
+  profile,
+  loading,
+  error,
+  formatCount,
+}: {
+  profile: InstagramProfile | null;
+  loading: boolean;
+  error: string | null;
+  formatCount: (n: number | null) => string;
+}) {
+  if (loading) {
+    return (
+      <div className="py-4 text-center">
+        <span className="inline-block animate-spin text-2xl">📸</span>
+        <p className="mt-2 font-display text-xs text-text-muted">
+          fetching Instagram profile...
+        </p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border-2 border-dashed border-freaky-red/30 bg-freaky-red/5 px-4 py-3 text-center">
+        <p className="font-display text-xs font-bold text-freaky-red">{error}</p>
+      </div>
+    );
+  }
+
+  if (!profile) return null;
+
+  return (
+    <div className="space-y-3">
+      {/* Header row */}
+      <div className="flex items-start gap-3">
+        {profile.profile_picture_url && (
+          <img
+            src={profile.profile_picture_url}
+            alt={profile.username}
+            className="h-14 w-14 rounded-xl border-2 border-freaky-dark/20 object-cover"
+          />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <p className="font-display text-sm font-bold text-freaky-dark">
+              {profile.full_name ?? profile.username}
+            </p>
+            {profile.is_verified && (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 font-display text-[10px] font-bold text-blue-600">
+                verified
+              </span>
+            )}
+            {profile.is_private && (
+              <span className="rounded-full bg-gray-100 px-2 py-0.5 font-display text-[10px] font-bold text-gray-600">
+                private
+              </span>
+            )}
+          </div>
+          <p className="font-mono text-xs text-text-muted">@{profile.username}</p>
+          {profile.biography && (
+            <p className="mt-1 text-xs leading-relaxed text-text-secondary">
+              {profile.biography}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-2">
+        <StatPill label="posts" value={formatCount(profile.posts_count)} />
+        <StatPill label="followers" value={formatCount(profile.followers_count)} />
+        <StatPill label="following" value={formatCount(profile.follows_count)} />
+      </div>
+
+      {/* Links */}
+      <div className="flex flex-wrap gap-2">
+        {profile.category && (
+          <span className="rounded-full border border-freaky-dark/15 bg-freaky-peach/20 px-2.5 py-1 font-display text-[10px] font-bold text-freaky-dark/70">
+            {profile.category}
+          </span>
+        )}
+        {profile.external_url && (
+          <a
+            href={profile.external_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="truncate rounded-full border border-freaky-dark/15 bg-bg-card px-2.5 py-1 font-mono text-[10px] text-freaky-dark/60 transition-colors hover:text-freaky-red"
+          >
+            🔗 {profile.external_url}
+          </a>
+        )}
+      </div>
+
+      {/* Recent posts */}
+      {profile.recent_posts.length > 0 && (
+        <div>
+          <p className="mb-2 font-display text-xs font-bold text-freaky-dark/60">
+            recent posts ({profile.recent_posts.length})
+          </p>
+          <div className="space-y-1.5">
+            {profile.recent_posts.slice(0, 5).map((post, i) => (
+              <div
+                key={i}
+                className="rounded-xl border border-freaky-dark/10 bg-bg-card/50 px-3 py-2"
+              >
+                <p className="line-clamp-2 text-xs text-text-secondary">
+                  {post.caption}
+                </p>
+                <div className="mt-1 flex gap-3 font-mono text-[10px] text-text-muted">
+                  {post.likes_count != null && <span>❤️ {formatCount(post.likes_count)}</span>}
+                  {post.comments_count != null && <span>💬 {formatCount(post.comments_count)}</span>}
+                  {post.timestamp && (
+                    <span>{new Date(post.timestamp).toLocaleDateString()}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Small components ───────────────────────────────────────
+
+function StatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-freaky-dark/10 bg-bg-card/50 px-3 py-2 text-center">
+      <p className="font-display text-sm font-bold text-freaky-dark">{value}</p>
+      <p className="font-display text-[10px] text-text-muted">{label}</p>
+    </div>
   );
 }
 
