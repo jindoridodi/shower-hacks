@@ -210,3 +210,35 @@ def test_chunk_api_preserves_whitespace_and_rejects_blank_text(client):
             'chunks': [{'chunk_index': 4, 'text': blank}],
         })
         assert rejected.status_code == 422
+
+
+def test_corpus_returns_only_the_requested_project(client):
+    first = create_project(client, name="First")
+    second = create_project(client, name="Second")
+    first_source = create_source(client, first["id"], "https://example.com/first")
+    second_source = create_source(client, second["id"], "https://example.org/second")
+    first_page = client.post(
+        "/documents",
+        json={
+            "source_id": first_source["id"],
+            "cleaned_text": "Alpha page",
+            "chunks": [{"chunk_index": 0, "text": "Alpha page"}],
+        },
+    )
+    second_page = client.post(
+        "/documents",
+        json={
+            "source_id": second_source["id"],
+            "cleaned_text": "Beta page",
+            "chunks": [{"chunk_index": 0, "text": "Beta page"}],
+        },
+    )
+    assert first_page.status_code == 201
+    assert second_page.status_code == 201
+
+    corpus = client.get(f"/api/projects/{first['id']}/corpus")
+    assert corpus.status_code == 200
+    body = corpus.json()
+    assert [source["id"] for source in body["sources"]] == [first_source["id"]]
+    assert [document["source_id"] for document in body["documents"]] == [first_source["id"]]
+    assert body["documents"][0]["chunks"][0]["text"] == "Alpha page"
