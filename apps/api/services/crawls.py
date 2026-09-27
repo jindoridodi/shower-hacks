@@ -11,10 +11,10 @@ from apps.api.config import repo_root
 from apps.api.db import transaction
 from apps.api.errors import APIError
 from apps.api.models import CrawlJob, Document, Source
-from apps.api.services.documents import stage_chunks, stage_document
 from apps.api.services.chunker import chunk_text
-from apps.api.services.processing import prepare_document
+from apps.api.services.documents import stage_chunks, stage_document
 from apps.api.services.firecrawl import PublicPageScraper, ScrapedPage, get_public_page_scraper
+from apps.api.services.processing import prepare_document
 from apps.api.services.sources import get_source, require_crawlable_source
 from apps.api.services.hashing import sha256_text
 from apps.api.services.urls import InvalidURL, canonicalize_url

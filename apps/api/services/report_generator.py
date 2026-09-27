@@ -46,7 +46,7 @@ def generate_report(
         }
 
     if use_fixtures:
-        report = _load_fixture_report(report_id, generated_at)
+        report = _load_fixture_report(report_id, generated_at, safe_evidence)
     else:
         if model is None:
             raise ReportGenerationError("A report model is required when fixture mode is disabled.")
@@ -57,12 +57,77 @@ def generate_report(
     return report
 
 
-def _load_fixture_report(report_id: str, generated_at: str) -> dict[str, Any]:
+def _load_fixture_report(
+    report_id: str,
+    generated_at: str,
+    evidence_excerpts: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
     with _REPORT_FIXTURE_PATH.open() as fixture_file:
         report = json.load(fixture_file)
     report["id"] = report_id
     report["generatedAt"] = generated_at
+
+    fixture_source_urls = _fixture_source_urls()
+    runtime_source_ids_by_url = {
+        excerpt.get("sourceUrl"): excerpt.get("sourceId")
+        for excerpt in evidence_excerpts
+        if isinstance(excerpt.get("sourceUrl"), str) and isinstance(excerpt.get("sourceId"), str)
+    }
+    remapped_claims = []
+    for claim in report.get("claims", []):
+        source_ids = claim.get("sourceIds")
+        if not isinstance(source_ids, list):
+            return _direct_fixture_report(report_id, generated_at, evidence_excerpts)
+        remapped_ids = [runtime_source_ids_by_url.get(fixture_source_urls.get(source_id)) for source_id in source_ids]
+        if any(not isinstance(source_id, str) for source_id in remapped_ids):
+            return _direct_fixture_report(report_id, generated_at, evidence_excerpts)
+        remapped_claims.append({**claim, "sourceIds": remapped_ids})
+    report["claims"] = remapped_claims
     return report
+
+
+def _fixture_source_urls() -> dict[str, str]:
+    fixture_evidence_path = _ROOT / "data/fixtures/evidence-excerpts.json"
+    with fixture_evidence_path.open() as fixture_file:
+        fixture_evidence = json.load(fixture_file)
+    return {
+        item["sourceId"]: item["sourceUrl"]
+        for item in fixture_evidence
+        if isinstance(item, dict)
+        and isinstance(item.get("sourceId"), str)
+        and isinstance(item.get("sourceUrl"), str)
+    }
+
+
+def _direct_fixture_report(
+    report_id: str,
+    generated_at: str,
+    evidence_excerpts: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Fallback fixture output for a project without the seed fixture URLs."""
+    claims = []
+    for index, excerpt in enumerate(evidence_excerpts, start=1):
+        source_id = excerpt.get("sourceId")
+        text = excerpt.get("text")
+        if not isinstance(source_id, str) or not isinstance(text, str) or not text.strip():
+            continue
+        claims.append(
+            {
+                "id": f"fixture-claim-{index}",
+                "text": text,
+                "claimType": "observed",
+                "confidence": 0.9,
+                "sourceIds": [source_id],
+            }
+        )
+    return {
+        "id": report_id,
+        "title": "Fixture evidence report",
+        "claims": claims,
+        "contradictions": [],
+        "unknowns": [],
+        "generatedAt": generated_at,
+    }
 
 
 def _render_prompt(
