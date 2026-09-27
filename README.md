@@ -1,6 +1,8 @@
 # freakypeeky
 
-![freakypeeky logo](apps/web/public/logo.png)
+<p align="center">
+  <img src="apps/web/public/banner.png" alt="freakypeeky banner" width="480" />
+</p>
 
 freakypeeky is a web-art prototype for exploring how public online fragments can be assembled into a portrait-like experience. It combines public username discovery, user-selected public links, Instagram profile lookup, source/corpus workflows, and source-grounded AI drafts.
 
