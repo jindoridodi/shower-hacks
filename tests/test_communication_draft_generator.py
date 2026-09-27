@@ -2,10 +2,14 @@ import json
 import unittest
 from pathlib import Path
 
+from sqlalchemy import func, select
+
+from apps.api.models import Report
 from apps.api.services.communication_draft_generator import (
     CommunicationDraftError,
     generate_communication_draft,
 )
+from tests.helpers import create_project
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,6 +94,26 @@ class CommunicationDraftGeneratorTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CommunicationDraftError, "require human review"):
             generate_communication_draft(recipient="Alex", evidence_excerpts=self.evidence, model=model)
+
+
+def test_draft_endpoint_returns_json_without_writing_a_report(client, session, monkeypatch):
+    class ExplodingModel:
+        def __init__(self, settings):
+            raise AssertionError(settings)
+
+    monkeypatch.setattr("apps.api.routes.generation.OpenAICompatibleTextModel", ExplodingModel)
+    project = create_project(client)
+    evidence = json.loads((ROOT / "data/fixtures/evidence-excerpts.json").read_text(encoding="utf-8"))
+    response = client.post(
+        f"/api/projects/{project['id']}/drafts",
+        json={"recipient": "Alex", "evidenceExcerpts": evidence, "useFixtures": True},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["label"] == "AI-generated draft — review before use"
+    assert body["reviewRequired"] is True
+    assert body["recipient"] == "Alex"
+    assert session.scalar(select(func.count()).select_from(Report)) == 0
 
 
 if __name__ == "__main__":
