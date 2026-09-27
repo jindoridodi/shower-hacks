@@ -64,9 +64,13 @@ POST /api/projects/{project_id}/crawls
 GET  /api/crawls/{crawl_id}
 GET  /api/projects/{project_id}/corpus
 POST /api/projects/{project_id}/reports
+POST /api/projects/{project_id}/reports/persisted
 POST /api/projects/{project_id}/drafts
+GET  /api/reports/{report_id}
 GET  /api/health
 ```
+
+`docs/04-integration-contract.md` is the field-level contract. Corpus projects, crawls, documents, and stored reports use `data/borrowed_intimacy.db`. `POST /api/projects` and `POST /api/projects/{project_id}/sources` use the OSINT database and are not aliases of `POST /projects` or `POST /sources`. `POST /api/projects/{project_id}/reports` generates JSON and does not write SQLite. `POST /api/projects/{project_id}/reports/persisted` stores that JSON with excerpts.
 
 Frontend can begin immediately by loading fixture responses from `data/fixtures/` that match these response shapes.
 
@@ -104,10 +108,12 @@ type CrawlResult = {
   markdown: string;
   links: string[];
   scrapedAt: string;
-  status: "complete" | "partial" | "failed";
+  status: "queued" | "running" | "succeeded" | "failed";
   error?: string;
 };
 ```
+
+The stored crawl job uses those four statuses. `complete` and `partial` are not crawl statuses. Discovery responses still use a separate `partial` boolean when a username provider fails. The corpus record is `CrawlJob` (`id`, `source_id`, `status`, `error_message`, `started_at`, `completed_at`), not a multi-source `source_count` object.
 
 Database behavior:
 

@@ -157,6 +157,9 @@ ON report_claims (report_id, position);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_crawl_jobs_one_active
 ON crawl_jobs (source_id)
 WHERE status IN ('queued', 'running');
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_claim_sources_claim_source_excerpt
+ON claim_sources (claim_id, source_id, excerpt);
 -- Store only filtered metadata and category labels, never rejected values.
 ALTER TABLE documents ADD COLUMN processing_metadata TEXT NOT NULL DEFAULT '{}';
 ALTER TABLE documents ADD COLUMN sensitivity_findings TEXT NOT NULL DEFAULT '[]';
@@ -179,3 +182,17 @@ BEGIN
     INSERT INTO document_chunks_fts (chunk_id, text)
     VALUES (new.id, new.text);
 END;
+
+CREATE TABLE source_approvals (
+    id TEXT PRIMARY KEY,
+    source_id TEXT NOT NULL UNIQUE REFERENCES sources (id) ON DELETE CASCADE,
+    target_username TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    confidence TEXT NOT NULL CHECK (confidence IN ('high', 'medium', 'low')),
+    match_reason TEXT NOT NULL,
+    provider_evidence TEXT NOT NULL,
+    approved_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_source_approvals_target_username
+ON source_approvals (target_username);

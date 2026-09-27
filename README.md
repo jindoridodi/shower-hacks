@@ -415,6 +415,12 @@ Request validation uses the code `validation_error`.
 | `GET` | `/reports/{report_id}` | Fetch a report with claims and excerpts |
 | `POST` | `/reports/{report_id}/claims` | Add a claim and optional source excerpts |
 | `POST` | `/report-claims/{claim_id}/sources` | Link another source excerpt to a claim |
+| `POST` | `/api/projects/{project_id}/crawls` | Queue a crawl when the source belongs to that corpus project |
+| `GET` | `/api/crawls/{crawl_id}` | Fetch the same crawl job as `GET /crawls/{crawl_id}` |
+| `PATCH` | `/api/crawls/{crawl_id}` | Same status update as `PATCH /crawls/{crawl_id}` |
+| `GET` | `/api/projects/{project_id}/corpus` | List corpus sources, documents, and chunks |
+| `POST` | `/api/projects/{project_id}/reports/persisted` | Store a generated report and its excerpts |
+| `GET` | `/api/reports/{report_id}` | Fetch the same stored report as `GET /reports/{report_id}` |
 
 Source creation body:
 
@@ -473,17 +479,11 @@ Every claim-source row stores an excerpt. The source must belong to the report's
 
 ### Firecrawl follow-up
 
-`get_public_page_scraper()` returns a stub. Implementing the client means:
+`get_public_page_scraper()` returns `FirecrawlPublicPageScraper` when `FIRECRAWL_API_KEY` is set, and a stub that raises `FirecrawlNotConfiguredError` otherwise. The configured client only scrapes URLs listed in `CRAWL_ALLOWED_URLS` whose hosts are listed in `CRAWL_TERMS_ACCEPTED_HOSTS`. It checks robots.txt, rate-limits requests, and retries transient Firecrawl errors. `run_queued_crawl` loads a queued job, scrapes `sources.url`, and calls `ingest_scraped_page`. A scraper exception marks the job `failed`. `ingest_scraped_page` still accepts a page only when its URL canonicalizes to the source URL, and the stored document remains `unreviewed`.
 
-1. Satisfy `PublicPageScraper.scrape_public_url(url) -> ScrapedPage` for a publicly accessible page.
-2. Have a worker load a `queued` crawl, call the scraper with `sources.canonical_url`, then call `ingest_scraped_page`.
-3. On a scraper exception, `PATCH /crawls/{id}` with `{"status": "failed", "error_message": "..."}`.
-4. Keep the client limited to a URL. The protocol has no cookie, session, or credential argument.
-5. Honor robots directives, rate limits, and site terms in that client.
-6. Handle redirects explicitly. `ingest_scraped_page` accepts a page only when its URL canonicalizes to the source URL.
-7. Chunking and sensitivity classification stay outside ingest. The stored document remains `unreviewed` until a later filter updates `sensitivity_status`.
+The corpus contract is documented in `docs/04-integration-contract.md`. Crawl jobs use `queued`, `running`, `succeeded`, and `failed`. `complete` and `partial` are not crawl statuses. Corpus errors use `{"detail": {"code", "message"}}`. `POST /api/projects` remains the OSINT project route and writes a different database. `POST /api/projects/{project_id}/reports/persisted` stores a generated report; `POST /api/projects/{project_id}/reports` only generates one.
 
-`docs/04-integration-contract.md` and `docs/06-team-integration-playbook.md` describe a thinner HTTP surface under `/api/...`, crawl statuses such as `complete` and `partial`, and a `claims` table. This slice follows the source-ledger brief: `/sources` and `/crawls`, statuses `queued`, `running`, `succeeded`, and `failed`, and `report_claims`. Agree on one contract before the frontend binds to field names.
+Stored pages use `documents.raw_text`, `documents.cleaned_text`, and `documents.raw_path` for the markdown file written at ingest. Chunks use `document_chunks.text` and `document_chunks.fts_text`. Search reads `document_chunks_fts`. `document_chunks.embedding` is stored as null until an embedding worker exists.
 
 ## License
 

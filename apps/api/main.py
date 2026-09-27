@@ -13,7 +13,7 @@ from apps.api.config import get_settings
 from apps.api.db import apply_migrations, make_engine, make_session_factory
 from apps.api.dependencies import get_db
 from apps.api.errors import APIError
-from apps.api.routes import crawls, documents, generation, instagram, projects, reports, sources
+from apps.api.routes import crawls, documents, generation, instagram, integration, projects, reports, sources
 from apps.api.routes.discovery import router as discovery_router
 from apps.api.routes.enrichment import router as enrichment_router
 from apps.api.routes.graph import router as graph_router
@@ -56,6 +56,7 @@ def create_app(
     app.include_router(instagram.router)
     app.include_router(documents.router)
     app.include_router(reports.router)
+    app.include_router(integration.router)
     app.include_router(generation.router)
     app.include_router(discovery_router)
     app.include_router(graph_router)

@@ -11,6 +11,7 @@ from apps.api.main import create_app
 REQUIRED_TABLES = {
     "projects",
     "sources",
+    "source_approvals",
     "crawl_jobs",
     "documents",
     "document_chunks",
@@ -34,7 +35,14 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     database_path = tmp_path / "app.db"
     first = apply_migrations(database_path)
     second = apply_migrations(database_path)
-    assert first == ["001_initial", "002_raw_document_contract", "002_uniqueness", "003_document_processing"]
+    assert first == [
+        "001_initial",
+        "002_raw_document_contract",
+        "002_uniqueness",
+        "003_claim_source_excerpt",
+        "003_document_processing",
+        "003_source_approvals",
+    ]
     assert second == []
 
     connection = sqlite3.connect(database_path)
@@ -56,9 +64,17 @@ def test_migrations_are_repeatable_and_create_tables(tmp_path):
     finally:
         connection.close()
     assert REQUIRED_TABLES <= names
-    assert versions == ["001_initial", "002_raw_document_contract", "002_uniqueness", "003_document_processing"]
+    assert versions == [
+        "001_initial",
+        "002_raw_document_contract",
+        "002_uniqueness",
+        "003_claim_source_excerpt",
+        "003_document_processing",
+        "003_source_approvals",
+    ]
     assert "uq_report_claims_report_position" in indexes
     assert "uq_crawl_jobs_one_active" in indexes
+    assert "uq_claim_sources_claim_source_excerpt" in indexes
 
 
 def test_create_app_can_open_the_same_database_twice(tmp_path):
@@ -150,7 +166,11 @@ def test_processing_migration_preserves_existing_documents(tmp_path):
         connection.execute("""INSERT INTO documents
             (id, source_id, content_hash, cleaned_text, sensitivity_status, created_at, updated_at)
             VALUES ('d', 's', ?, 'Existing text', 'unreviewed', 'now', 'now')""", ('a' * 64,))
-    assert apply_migrations(database_path) == ['003_document_processing']
+    assert apply_migrations(database_path) == [
+        "003_claim_source_excerpt",
+        "003_document_processing",
+        "003_source_approvals",
+    ]
     assert apply_migrations(database_path) == []
     with sqlite3.connect(database_path) as connection:
         row = connection.execute('SELECT cleaned_text, sensitivity_status, processing_metadata, sensitivity_findings, metadata_findings FROM documents').fetchone()
