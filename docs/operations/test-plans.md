@@ -115,7 +115,7 @@ Patch the Apify client. Do not send a real `APIFY_API_TOKEN` in the default suit
 | WEB-11 | automated | Open `/persona` | Redirects to `/love-letters`. |
 | WEB-12 | automated | Generate a letter on `/love-letters` | The sample letter renders on the page. No API request is sent. |
 
-`/ingest`, `/generate`, `/reveal`, and `/corpus/[id]` are empty pages. Do not write behavior tests for them until they render a flow.
+`/ingest`, `/generate`, `/reveal`, and `/corpus/[id]` were removed because their empty page files made `next build` fail. Add them back only with a real page module.
 
 ## 6. Generation, drafts, and timeline
 
@@ -160,4 +160,4 @@ Do not add these as tests that are expected to pass today.
 | Report generation reads stored documents on its own | The generator uses the excerpts passed into the call. |
 | Contradictions are stored and shown | Persistence ignores `contradictions`. |
 | Private Instagram policy | The endpoint does not yet define what a private profile returns. |
-| `/ingest`, `/generate`, `/reveal`, `/corpus/[id]` | Those page files are empty. |
+| `/ingest`, `/generate`, `/reveal`, `/corpus/[id]` | Removed. Empty files are not valid Next.js page modules. |
