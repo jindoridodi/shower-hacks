@@ -76,13 +76,6 @@ def test_canonical_project_source_and_crawl_routes() -> None:
     assert client.delete(f"/api/projects/{project_id}/sources/{source_id}").status_code == 204
 
 
-def test_osint_test_ui_is_served_from_root() -> None:
-    response = make_client().get("/")
-    assert response.status_code == 200
-    assert "Borrowed" in response.text
-    assert "/api/discovery" in response.text
-
-
 def test_discovery_fixture_response_uses_camel_case_contract() -> None:
     response = make_client().post("/api/discovery", json={"query": "demo-user"})
     assert response.status_code == 200

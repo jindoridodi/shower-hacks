@@ -60,10 +60,6 @@ The OSINT database path is relative to the process working directory. The corpus
 
 `apps/api/services/timeline_extractor.py` matches strings such as `2020-13-40` and `February 30, 2020`, then calls `date.fromisoformat` or `strptime`. Those calls raise `ValueError`. One bad excerpt fails the whole timeline.
 
-### The test UI mishandles this API’s errors
-
-`apps/api/static/index.html` builds discovery errors with `data.detail.map(...)`. Validation errors from this app are an object (`code`, `message`, `errors`). Project-not-found is a string. Both throw `detail.map is not a function` instead of showing the API message.
-
 ## Low
 
 ### `requirements.txt` cannot install the app
