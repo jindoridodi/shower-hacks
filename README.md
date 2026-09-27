@@ -1,5 +1,7 @@
 # freakypeeky
 
+![freakypeeky logo](apps/web/public/logo.png)
+
 freakypeeky is a web-art prototype for exploring how public online fragments can be assembled into a portrait-like experience. It combines public username discovery, user-selected public links, Instagram profile lookup, source/corpus workflows, and source-grounded AI drafts.
 
 The project treats discovery results as suggestions, not identity proof. It does not log into accounts, bypass access controls, download Instagram media, or automatically crawl a discovered link.
