@@ -39,11 +39,11 @@ Keep secrets in `.env`; do not commit them or put them in frontend code.
 
 ### 3. Start the live API
 
-Keep this terminal open:
+In **Terminal 1**, stay in the repository root (the folder containing `.venv` and `apps/`) and keep this process open:
 
 ```bash
 source .venv/bin/activate
-uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
 
 Open the API explorer at <http://127.0.0.1:8000/docs>.
@@ -58,7 +58,7 @@ Health: <http://127.0.0.1:8000/api/health>
 
 ### 4. Start the freakypeeky frontend
 
-In a second terminal:
+In **Terminal 2**, start from the repository root, then run:
 
 ```bash
 cd apps/web
@@ -72,12 +72,12 @@ Open <http://localhost:3000>.
 
 ## Fixture mode
 
-Use fixtures for offline work, repeatable demos, or when live providers are unavailable. Restart Uvicorn with:
+Use fixtures for offline work, repeatable demos, or when live providers are unavailable. In the repository root, stop the live API with `Ctrl+C`, then restart it with:
 
 ```bash
 source .venv/bin/activate
 OSINT_USE_FIXTURES=true INSTAGRAM_USE_FIXTURES=true \
-uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn apps.api.main:app --host 127.0.0.1 --port 8000
 ```
 
 | Route | Request body | Expected result |
