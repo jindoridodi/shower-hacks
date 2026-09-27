@@ -98,22 +98,22 @@ Patch the Apify client. Do not send a real `APIFY_API_TOKEN` in the default suit
 
 ## 5. Frontend
 
-`apps/web` has no test script yet. These cases are for a browser runner against `http://127.0.0.1:3000/` while the API runs at `http://127.0.0.1:8000/` with `OSINT_USE_FIXTURES=true`. Search is still mocked, so a passing UI test does not prove the API was called.
+`apps/web` tests run with Playwright: `npm test` from `apps/web`. Search is still mocked, so a passing UI test does not prove the API was called. The name, username, and link cards are labels. WEB-02 types those example values.
 
 | ID | Status | Action | Expected |
 |---|---|---|---|
-| WEB-01 | gap | Open `/` | Heading is visible. The search box is empty. **peek!** is disabled. |
-| WEB-02 | gap | Choose the Name, Username, and Link examples | The box fills and **peek!** becomes enabled. |
-| WEB-03 | gap | Submit a known mock query | Mock accounts render. No request is sent to `/api/discovery`, `/instagram/profiles`, `/crawls`, or `/reports`. |
-| WEB-04 | gap | Submit an empty query | The control stays disabled or an empty state shows. No crawl or report request is sent. |
-| WEB-05 | gap | Save a profile, reload `/` | The profile is listed under saved profiles. It is in `localStorage`, not in either SQLite database. |
-| WEB-06 | gap | Open the love-letters flow | Draft text is visible and labeled as AI-generated and review-only. No send, post, email, or export control exists. |
-| WEB-07 | gap | Open a claim that has an excerpt | The excerpt text is visible. |
-| WEB-08 | gap | Load `/` at a narrow viewport | Search, results, and saved profiles remain usable. |
-| WEB-09 | gap | Open `/personalization` with fixtures on | Claims show type, confidence, and an evidence excerpt. A year-only timeline event is separate from a full date. The draft is editable, labeled AI-generated, and says review is required. No send, post, email, export, or calendar control. |
-| WEB-10 | gap | Open `/personalization` with `NEXT_PUBLIC_USE_FIXTURES=false` | A readable load error. No substituted fixture content. |
-| WEB-11 | gap | Open `/persona` | Redirects to `/love-letters`. |
-| WEB-12 | gap | Open `/love-letters` | A letter can be generated in the page. It is not posted or sent. |
+| WEB-01 | automated | Open `/` | Heading is visible. The search box is empty. **peek!** is disabled. `apps/web/e2e/frontend.spec.ts` |
+| WEB-02 | automated | Type the Name, Username, and Link examples | The box fills and **peek!** becomes enabled. The cards themselves are labels. |
+| WEB-03 | automated | Submit a known mock query | Mock accounts render. No request is sent to `/api/discovery`, `/instagram/profiles`, `/crawls`, or `/reports`. |
+| WEB-04 | automated | Submit an empty query | **peek!** stays disabled. No crawl or report request is sent. |
+| WEB-05 | automated | Save a profile, reload `/` | The profile is listed under saved profiles. It is in `localStorage`. |
+| WEB-06 | automated | Open `/love-letters` and generate a letter | The letter is visible and labeled AI-generated and review-only. No post, email, or export control. |
+| WEB-07 | automated | Open a claim that has an excerpt | The excerpt text is visible. |
+| WEB-08 | automated | Load `/` at a narrow viewport | Search, results, and saved profiles remain usable. |
+| WEB-09 | automated | Open `/personalization` with fixtures on | Claims show type, confidence, and an evidence excerpt. A year-only timeline event is separate from a full date. The draft is editable, labeled AI-generated, and says review is required. No send, post, email, export, or calendar control. |
+| WEB-10 | automated | Call `loadPersonalizationData` with `NEXT_PUBLIC_USE_FIXTURES=false` | The live-adapter error is thrown. No fixture content is returned. |
+| WEB-11 | automated | Open `/persona` | Redirects to `/love-letters`. |
+| WEB-12 | automated | Generate a letter on `/love-letters` | The sample letter renders on the page. No API request is sent. |
 
 `/ingest`, `/generate`, `/reveal`, and `/corpus/[id]` are empty pages. Do not write behavior tests for them until they render a flow.
 
